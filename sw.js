@@ -2,7 +2,7 @@
 // uploaded photos, form data or a navigation URL containing user parameters.
 const scope = new URL(self.registration.scope)
 const prefix = 'adrio-shell:' + scope.pathname + ':'
-const version = prefix + 'portal-1'
+const version = prefix + 'album-1'
 const paths = [
   'index.html',
   'style.css',
@@ -19,6 +19,8 @@ const paths = [
     'sync',
     'overview',
     'diary',
+    'album',
+    'photos',
     'phases',
   ].map((n) => 'src/' + n + '.js'),
 ]

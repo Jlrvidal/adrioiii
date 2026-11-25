@@ -1,53 +1,10 @@
+import { optimize, addPhoto, photoSource, dailyPath } from './photos.js'
 import { element as el } from './chart.js'
 import { phases } from './schedule.js'
 import { day } from './phases.js'
 const $ = (id) => document.getElementById(id),
   bucket = 'adrio-diary'
 const filename = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}\.webp$/
-export async function optimize(file) {
-  if (
-    !file ||
-    !['image/webp', 'image/jpeg', 'image/png'].includes(file.type) ||
-    file.size > 12 * 1024 * 1024
-  )
-    throw Error('Elige una foto JPEG, PNG o WebP de hasta 12 MB.')
-  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer()),
-    ascii = (i, n) => String.fromCharCode(...bytes.slice(i, i + n))
-  if (
-    !(
-      (file.type === 'image/jpeg' &&
-        bytes[0] === 255 &&
-        bytes[1] === 216 &&
-        bytes[2] === 255) ||
-      (file.type === 'image/png' &&
-        bytes[0] === 137 &&
-        ascii(1, 3) === 'PNG') ||
-      (file.type === 'image/webp' &&
-        ascii(0, 4) === 'RIFF' &&
-        ascii(8, 4) === 'WEBP')
-    )
-  )
-    throw Error('El formato de la fotografía no coincide con el archivo.')
-  const bitmap = await createImageBitmap(file)
-  try {
-    for (const width of [1440, 1024, 768, 512]) {
-      const scale = Math.min(1, width / Math.max(bitmap.width, bitmap.height)),
-        canvas = document.createElement('canvas')
-      canvas.width = Math.max(1, Math.round(bitmap.width * scale))
-      canvas.height = Math.max(1, Math.round(bitmap.height * scale))
-      canvas
-        .getContext('2d')
-        .drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, 'image/webp', 0.76),
-      )
-      if (blob?.type === 'image/webp' && blob.size <= 307200) return blob
-    }
-    throw Error('No se ha podido comprimir la fotografía.')
-  } finally {
-    bitmap.close()
-  }
-}
 async function result(query) {
   const { data, error } = await query
   if (error) throw error
@@ -79,6 +36,7 @@ export function diary(api, changed) {
     $('entryPhase').append(option(id, title))
   }
   async function photo(name) {
+    if (dailyPath.test(name)) return photoSource(db, name)
     if (!filename.test(name)) throw Error()
     if (!photos.has(name)) {
       photos.set(
@@ -221,7 +179,9 @@ export function diary(api, changed) {
           button('Retirar', async () => {
             if (
               !confirm(
-                '¿Retirar esta observación y su fotografía del diario público?',
+                dailyPath.test(row.photo)
+                  ? '¿Retirar la observación? Su foto seguirá en el álbum del día.'
+                  : '¿Retirar esta observación del diario público?',
               )
             )
               return
@@ -235,7 +195,7 @@ export function diary(api, changed) {
                   .select('id')
                   .single(),
               )
-              if (row.photo) await storage.remove([row.photo])
+              if (filename.test(row.photo)) await storage.remove([row.photo])
               await refresh()
             } catch {
               $('warning').textContent =
@@ -357,7 +317,8 @@ export function diary(api, changed) {
       prepared = {
         fields,
         blob,
-        name: blob ? crypto.randomUUID() + '.webp' : (editing?.photo ?? null),
+        name: editing?.photo ?? null,
+        uploadId: crypto.randomUUID(),
       }
       const box = $('entryPreview')
       box.replaceChildren(
@@ -385,31 +346,30 @@ export function diary(api, changed) {
   }
   $('publishEntry').onclick = async () => {
     if (!admin || !prepared) return
-    const { fields, blob, name } = prepared
+    const draft = prepared
+    const { fields, blob } = draft
     $('publishEntry').disabled = true
     try {
-      if (blob && !prepared.uploaded) {
-        await result(
-          storage.upload(name, blob, {
-            contentType: 'image/webp',
-            upsert: false,
-          }),
-        )
-        prepared.uploaded = true
+      if (blob && !draft.uploaded) {
+        draft.name = await addPhoto(db, blob, draft.uploadId)
+        draft.uploaded = true
       }
+      const name = draft.name
       const values = { ...fields, photo: name }
       let q = db.from('adrio_diary')
       q = editing
         ? q.update(values).eq('id', editing.id).eq('version', editing.version)
         : q.insert({ id: entryId, ...values })
       await result(q.select('id').single())
-      if (editing?.photo && editing.photo !== name)
+      if (filename.test(editing?.photo) && editing.photo !== name)
         await storage.remove([editing.photo])
       $('entryDialog').close()
       await refresh()
-    } catch {
-      $('entryError').textContent =
-        'No se ha confirmado la publicación. Comprueba el diario antes de reintentar.'
+      window.dispatchEvent(new Event('adrio-photos-changed'))
+    } catch (err) {
+      $('entryError').textContent = err.message?.includes('tres fotos')
+        ? err.message
+        : 'No se ha confirmado la publicación. Comprueba el diario antes de reintentar.'
     } finally {
       $('publishEntry').disabled = false
     }

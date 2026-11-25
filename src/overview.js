@@ -10,16 +10,7 @@ const delta = (n) =>
       ' ' +
       (Math.abs(n) === 1 ? 'mes' : 'meses') +
       (n > 0 ? ' más tarde' : ' antes')
-export function overview(
-  state,
-  mode,
-  now,
-  known,
-  entries,
-  series,
-  compare,
-  baseline,
-) {
+export function overview(state, mode, now, known, entries, compare, baseline) {
   const plan = state.plans[mode],
     actual = state.completed.filter(Boolean).length
   const expected = plan.filter((p) => p.s + p.d <= now).length
@@ -49,19 +40,13 @@ export function overview(
     ['optimista', 'early'],
     ['pesimista', 'late'],
   ]) {
-    const end = delivery(state.plans[m]),
-      prior = series.at(-2)?.[m]
+    const end = delivery(state.plans[m])
     $(id).textContent = format(end)
     $(id + 'Delta').textContent =
       Math.max(0, Math.ceil(end - now)) +
       ' meses restantes · ' +
       delta(end - delivery(base.plans[m])).toLowerCase() +
-      ' respecto al plan inicial' +
-      (Number.isInteger(prior)
-        ? ' · ' +
-          delta(end - prior).toLowerCase() +
-          ' desde la revisión anterior'
-        : '')
+      ' respecto al plan inicial'
   }
   const events = plan
     .flatMap((p, i) =>
@@ -225,84 +210,4 @@ export function overview(
     journey.append(b)
   })
   return detail
-}
-export function forecasts(rows, unavailable = false) {
-  const box = $('forecasts')
-  box.replaceChildren()
-  if (!rows || rows.length < 2) {
-    box.append(
-      el(
-        'p',
-        unavailable
-          ? 'No se ha podido consultar el histórico de previsiones.'
-          : 'La evolución se mostrará cuando haya dos publicaciones para comparar.',
-        'empty',
-      ),
-    )
-    return
-  }
-  const ns = 'http://www.w3.org/2000/svg',
-    svg = document.createElementNS(ns, 'svg')
-  svg.setAttribute('viewBox', '0 0 760 175')
-  svg.setAttribute('role', 'img')
-  svg.setAttribute(
-    'aria-label',
-    'Evolución de la entrega por fecha de publicación. Valores en la tabla de revisiones.',
-  )
-  const times = rows.map((r) => Date.parse(r.published_at)),
-    minT = Math.min(...times),
-    maxT = Math.max(...times)
-  const vals = rows.flatMap((r) => [r.optimista, r.pesimista]),
-    low = Math.min(...vals) - 1,
-    high = Math.max(...vals) + 1
-  const x = (i) => 88 + ((times[i] - minT) / Math.max(1, maxT - minT)) * 650,
-    y = (n) => 135 - ((n - low) / (high - low)) * 118
-  function text(x, y, t) {
-    const l = document.createElementNS(ns, 'text')
-    l.setAttribute('x', x)
-    l.setAttribute('y', y)
-    l.textContent = t
-    svg.append(l)
-  }
-  for (const n of new Set([low + 1, Math.round((high + low) / 2), high - 1]))
-    text(0, y(n), format(n))
-  for (const mode of ['optimista', 'pesimista']) {
-    const path = document.createElementNS(ns, 'polyline')
-    path.setAttribute(
-      'points',
-      rows.map((r, i) => x(i) + ',' + y(r[mode])).join(' '),
-    )
-    path.setAttribute('class', mode)
-    svg.append(path)
-  }
-  text(88, 165, new Date(minT).toLocaleDateString('es-ES'))
-  text(657, 165, new Date(maxT).toLocaleDateString('es-ES'))
-  box.append(svg)
-  const last = rows.at(-1),
-    prior = rows.at(-2)
-  box.append(
-    el(
-      'p',
-      'Optimista: ' +
-        delta(last.optimista - prior.optimista) +
-        '. Pesimista: ' +
-        delta(last.pesimista - prior.pesimista) +
-        '.',
-    ),
-  )
-  const log = el('details')
-  log.append(el('summary', 'Ver todas las publicaciones'))
-  for (const r of [...rows].reverse())
-    log.append(
-      el(
-        'p',
-        day(r.published_at) +
-          ' · Optimista: ' +
-          format(r.optimista) +
-          ' · Pesimista: ' +
-          format(r.pesimista) +
-          (r.reason ? ' · ' + r.reason : ''),
-      ),
-    )
-  box.append(log)
 }

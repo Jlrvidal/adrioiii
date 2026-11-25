@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=portal3" />
+    <link rel="stylesheet" href="./style.css?v=album1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=portal3"></script>
-    <script type="module" src="./src/app.js?v=portal3"></script>
+    <script defer src="./config.js?v=album1"></script>
+    <script type="module" src="./src/app.js?v=album1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -40,8 +40,7 @@
         <a class="brand" href="#portada">Adrio <em>III</em></a>
         <div class="navlinks">
           <a href="#calendario">Calendario</a
-          ><a href="#diario">Diario de obra</a
-          ><a href="#evolucion">Evolución</a>
+          ><a href="#diario">Diario de obra</a><a href="#album">Fotos</a>
         </div>
         <nav>
           <label
@@ -61,22 +60,28 @@
       <button id="returnEdit" hidden>Volver a administración</button>
       <section class="cover" id="portada">
         <div class="covertext">
-          <span class="kicker">Seguimiento de obra independiente</span>
+          <span class="kicker">Cuaderno de obra</span>
           <h1>Adrio <i>III</i></h1>
           <p>
             Cuatro plantas de viviendas, incluida la baja,<br />
             y dos niveles de garaje.
           </p>
+          <a class="albumShortcut" href="#album">Ir al álbum de obra ↓</a>
           <div class="coverstatus">
             <span id="status" role="status"></span><small id="stamp"></small>
           </div>
         </div>
-        <figure>
-          <img
-            src="./assets/section.svg"
-            alt="Sección esquemática de los niveles del edificio"
-          />
-          <figcaption>Sección orientativa · sin escala</figcaption>
+        <figure id="coverFig">
+          <a id="coverLink"
+            ><img
+              id="coverPhoto"
+              src="./assets/section.svg"
+              alt="Sección esquemática de los niveles del edificio"
+            />
+          </a>
+          <figcaption id="coverCaption">
+            Sección orientativa · sin escala
+          </figcaption>
         </figure>
       </section>
       <section class="outlook" aria-label="Previsiones y progreso">
@@ -107,7 +112,6 @@
       <section id="calendario" class="planning">
         <div class="sectionTitle">
           <div>
-            <span class="kicker">Planificación</span>
             <h2>Calendario de obra</h2>
           </div>
           <div class="tabs" aria-label="Escenario">
@@ -122,7 +126,8 @@
             ><button id="vertical">Por fases</button>
           </div>
           <label><input type="checkbox" id="baseline" /> Plan inicial</label
-          ><button id="goToday">Ir a hoy</button>
+          ><button id="goToday">Ir a hoy</button
+          ><button id="chartAlbum" disabled>Fotos por día</button>
         </div>
         <div class="scroll" tabindex="0" aria-label="Calendario desplazable">
           <div id="chart"></div>
@@ -147,7 +152,6 @@
       <div class="journey" id="journey" aria-label="Hitos de la obra"></div>
       <section class="upcoming">
         <div>
-          <span class="kicker">En el horizonte</span>
           <h2>Próximos hitos</h2>
         </div>
         <div id="milestones"></div>
@@ -155,9 +159,61 @@
       <section id="diario" class="journal">
         <div class="sectionTitle">
           <div>
-            <span class="kicker">Observaciones de la obra</span>
             <h2>Diario de obra</h2>
           </div>
+        </div>
+        <section id="album" aria-labelledby="albumTitle">
+          <div class="albumHead">
+            <h3 id="albumTitle">Fotos de la obra</h3>
+            <div class="albumNav">
+              <button
+                id="olderDay"
+                aria-label="Día anterior con fotos"
+                disabled
+              >
+                ←
+              </button>
+              <select id="albumDate" aria-label="Día del álbum"></select>
+              <button
+                id="newerDay"
+                aria-label="Día siguiente con fotos"
+                disabled
+              >
+                →
+              </button>
+            </div>
+          </div>
+          <div id="dailyImages"></div>
+          <form id="photoUpload">
+            <label
+              >Añadir una foto de hoy<input
+                type="file"
+                id="sharePhoto"
+                required
+                disabled
+                accept="image/jpeg,image/png,image/webp"
+            /></label>
+            <button id="addDaily" disabled>Publicar foto</button>
+            <small id="photoQuota"></small>
+          </form>
+          <p id="uploadMessage" role="status"></p>
+        </section>
+        <h3>Comentarios</h3>
+        <div id="commentsList"></div>
+        <form id="commentForm" hidden>
+          <label>Fecha<input id="commentDate" type="date" required /></label>
+          <label
+            >Comentario<textarea
+              id="commentText"
+              maxlength="600"
+              required
+            ></textarea>
+          </label>
+          <button id="postComment">Publicar comentario</button>
+        </form>
+        <p id="commentMessage" role="status"></p>
+        <div class="albumHead">
+          <h3>Observaciones por fase</h3>
           <label
             >Fase
             <select id="filter"></select
@@ -165,11 +221,6 @@
         </div>
         <div id="entries"></div>
         <div id="comparePhotos"></div>
-      </section>
-      <section id="evolucion">
-        <span class="kicker">Histórico de entrega</span>
-        <h2>Evolución de las previsiones</h2>
-        <div id="forecasts"></div>
       </section>
       <section id="admin" class="panel pad" hidden>
         <h2>Administración</h2>
@@ -180,12 +231,6 @@
         <button id="viewAsVisitor">Vista de visitante</button
         ><button id="newEntry" hidden>Nueva observación</button>
         <div id="manageEntries"></div>
-        <form id="forecastNote" hidden>
-          <label
-            >Explicación de la revisión actual
-            <input id="reason" required maxlength="240" /></label
-          ><button>Guardar explicación pública</button>
-        </form>
         <p id="draft"></p>
         <p id="warning" role="alert"></p>
         <details id="editor">
@@ -260,6 +305,11 @@
       <div id="phaseBody"></div>
       <form method="dialog"><button>Cerrar</button></form>
     </dialog>
+    <dialog id="albumPicker">
+      <h2>Elegir día de obra</h2>
+      <div id="monthDays"></div>
+      <form method="dialog"><button>Cerrar</button></form>
+    </dialog>
     <dialog id="photoDialog">
       <div id="photoBody"></div>
       <form method="dialog"><button>Cerrar</button></form>
@@ -288,7 +338,7 @@
             maxlength="1500"
           ></textarea></label
         ><label
-          >Fotografía opcional<input
+          >Fotografía opcional · cuenta para el álbum de hoy<input
             id="photoFile"
             type="file"
             accept="image/jpeg,image/png,image/webp" /></label
