@@ -7,6 +7,8 @@ export const phases = [
   ['finishes', 'Acabados interiores'],
   ['delivery', 'Trámites y entrega'],
 ]
+// Keep the stored keys compatible with published schedules, history and backups.
+export const scenarioNames = { pesimista: 'realista', optimista: 'optimista' }
 export const modes = ['optimista', 'pesimista']
 // Each phase after foundation depends on its predecessor. Values are maximum
 // months of overlap with that predecessor; zero means finish-to-start.

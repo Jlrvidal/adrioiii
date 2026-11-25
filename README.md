@@ -5,7 +5,7 @@ Calendario público de las cuatro plantas de viviendas y los dos sótanos de Adr
 
 ## Portal para residentes · actualización de noviembre de 2026
 
-El portal distingue el calendario inicial, una copia de la última publicación, los borradores de administración y los datos recién leídos. El mes de entrega se compara con el plan original. La previsión mide tiempo y los hitos cuentan confirmaciones. Una fase puede tener una observación de trabajo en ejecución o de retraso sin haberse completado. Al pasar 90 días sin otra observación de estado, se etiqueta como información antigua. El modelo conserva la precisión mensual del calendario de origen. Las observaciones del diario tienen precisión diaria.
+El portal distingue el calendario inicial, una copia de la última publicación, los borradores de administración y los datos recién leídos. El calendario abre en el escenario realista y permite consultar el optimista o comparar ambos. La previsión mide tiempo y los hitos cuentan confirmaciones. El modelo conserva la precisión mensual del calendario de origen. Las observaciones del diario tienen precisión diaria.
 
 **Activación en un proyecto existente**
 
@@ -43,7 +43,7 @@ Desde la carpeta del repositorio, ejecuta `python3 -m http.server 8080 --bind 12
 | `migrations/` | Inventario de solo lectura y migración transaccional 001 |
 | `tests/` | Pruebas de dominio, sincronización, navegador y PostgreSQL |
 
-El mes cero es diciembre de 2026. El fin es exclusivo. Una fase que va de diciembre a marzo dura tres meses. Cada fase depende de la anterior. Las tablas de solapamiento de `schedule.js` y la validación SQL tienen que coincidir. Al editar se conserva la holgura adicional de cada descendiente. La previsión optimista y la pesimista se editan por separado. Confirmar un hito copia las fechas al otro escenario y bloquea ambos. Una incompatibilidad con las dependencias exige revisar las fechas antes de confirmar. La aplicación admite inicios desde cinco años antes de la base y fines hasta veinte años después.
+El mes cero es diciembre de 2026. El fin es exclusivo. Una fase que va de diciembre a marzo dura tres meses. Cada fase depende de la anterior. Las tablas de solapamiento de `schedule.js` y la validación SQL tienen que coincidir. Al editar se conserva la holgura adicional de cada descendiente. La previsión realista y la optimista se editan por separado. Confirmar un hito copia las fechas al otro escenario y bloquea ambos. Una incompatibilidad con las dependencias exige revisar las fechas antes de confirmar. La aplicación admite inicios desde cinco años antes de la base y fines hasta veinte años después.
 
 La fila 1 de `public.schedule` contiene la publicación. La lectura convierte el formato original en memoria. La primera publicación del administrador guarda la versión 2 y una proyección compatible con el lector anterior. La base comprueba la revisión, conserva la versión previa e incrementa el número en una sola transacción. Un cambio de escenario no entra en este flujo.
 

@@ -230,7 +230,7 @@ export function diary(api, changed) {
           db
             .from('adrio_diary')
             .select(
-              'id,observed,phase,observation,title,body,caption,photo,published_at,version',
+              'id,observed,phase,title,body,caption,photo,published_at,version',
             )
             .order('observed', { ascending: false })
             .order('published_at', { ascending: false })
@@ -285,7 +285,6 @@ export function diary(api, changed) {
     $('entryPhase').value = row?.phase ?? phases[0][0]
     $('entryTitle').value = row?.title ?? ''
     $('entryText').value = row?.body ?? ''
-    $('obState').value = row?.observation ?? ''
     $('caption').value = row?.caption ?? ''
     $('entryDialog').showModal()
   }
@@ -309,7 +308,6 @@ export function diary(api, changed) {
       const fields = {
         observed: $('observed').value,
         phase: $('entryPhase').value,
-        observation: $('obState').value,
         title: $('entryTitle').value.trim(),
         body: $('entryText').value.trim(),
         caption: $('caption').value.trim(),
