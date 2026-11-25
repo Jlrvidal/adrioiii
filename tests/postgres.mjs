@@ -344,22 +344,18 @@ assert.equal(
     .rows[0].photo,
   null,
 )
-for (let day = 0; day < 3; day++) {
-  await anon()
-  for (let i = 0; i < 10; i++)
-    assert.equal((await newUpload()).rows[0].path, 'pendiente')
-  if (day === 0)
-    await assert.rejects(newUpload(), /pendientes de hoy está llena/)
-  await db.exec('reset role')
-  await db.query(
-    'update adrio_private.photo_queue set submitted_on=$1::date-$2::int where submitted_on=$1::date',
-    [date, day + 1],
-  )
-}
+await anon()
+for (let i = 0; i < 3; i++)
+  assert.equal((await newUpload()).rows[0].path, 'pendiente')
+await assert.rejects(newUpload(), /pendientes está llena/)
+await db.exec('reset role')
+await db.query('update adrio_private.photo_queue set submitted_on=$1::date-1', [
+  date,
+])
 await anon()
 await assert.rejects(newUpload(), /pendientes está llena/)
 await admin()
-assert.equal((await pending()).length, 30)
+assert.equal((await pending()).length, 3)
 assert.equal((await newUpload()).rows[0].path, date + '/1.jpg')
 const olderDay = (await pending()).find(
   (row) => String(row.submitted_on) !== date,

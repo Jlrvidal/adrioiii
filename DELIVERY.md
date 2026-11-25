@@ -4,7 +4,7 @@
 
 ## Photo moderation
 
-Migration 004 sends visitor uploads to a private queue of up to 10 pending photos per Madrid calendar day and 30 in total. Pending uploads leave published slots available for the administrator. The moderation panel previews, approves and rejects entries. The administrator can publish directly and remove published photos. Removing a legacy album photo preserves its diary attachment and Storage object.
+Migration 004 sends visitor uploads to a private queue of up to three pending photos in total across all dates. Pending uploads leave published slots available for the administrator. The moderation panel previews, approves and rejects entries. The administrator can publish directly and remove published photos. Removing a legacy album photo preserves its diary attachment and Storage object.
 
 Back up the database and the legacy Storage bucket, apply 004 after 003, then publish the matching frontend. Keep 004 and the pending queue if rolling back the frontend. The prior frontend cannot show pending confirmations or moderation controls. The moderation release was tested with local PGlite and Playwright mocks.
 

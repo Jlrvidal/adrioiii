@@ -24,8 +24,7 @@ create or replace function public.adrio_add_photo(upload_id uuid, image_base64 t
 language plpgsql security definer set search_path='' as $$
 declare
   photo_day date := (statement_timestamp() at time zone 'Europe/Madrid')::date;
-  daily_queue_limit constant int := 10;
-  total_queue_limit constant int := 30;
+  total_queue_limit constant int := 3;
   admin boolean := public.adrio_is_admin();
   free_slot smallint;
   image_bytes bytea;
@@ -52,9 +51,6 @@ begin
     insert into adrio_private.daily_photos(taken,slot,request_id,jpeg)
       values(photo_day,free_slot,upload_id,image_bytes);
     return photo_day::text||'/'||free_slot||'.jpg';
-  end if;
-  if (select count(*) from adrio_private.photo_queue where submitted_on=photo_day)>=daily_queue_limit then
-    raise exception 'La cola de fotos pendientes de hoy está llena';
   end if;
   if (select count(*) from adrio_private.photo_queue)>=total_queue_limit then
     raise exception 'La cola de fotos pendientes está llena';
