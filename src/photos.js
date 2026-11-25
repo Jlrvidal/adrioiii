@@ -76,11 +76,12 @@ export async function addPhoto(db, blob, uploadId) {
   })
   if (error)
     throw Error(
-      error.message.includes('tres fotos')
+      /tres fotos|cola de fotos pendientes/.test(error.message)
         ? error.message
         : 'No se pudo subir la foto. Vuelve a intentarlo.',
     )
-  if (!dailyPath.test(data)) throw Error('No se ha confirmado la subida.')
+  if (data !== 'pendiente' && !dailyPath.test(data))
+    throw Error('No se ha confirmado la subida.')
   return data
 }
 export async function photoSource(db, path) {
@@ -91,5 +92,9 @@ export async function photoSource(db, path) {
     position_in_day: Number(name[0]),
   })
   if (error || !data) throw Error('Foto no disponible.')
-  return 'data:image/jpeg;base64,' + data.replace(/\s/g, '')
+  return jpegSource(data)
+}
+
+export function jpegSource(base64) {
+  return 'data:image/jpeg;base64,' + base64.replace(/\s/g, '')
 }

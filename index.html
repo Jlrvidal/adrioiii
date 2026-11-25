@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=realista1" />
+    <link rel="stylesheet" href="./style.css?v=moderacion1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=realista1"></script>
-    <script type="module" src="./src/app.js?v=realista1"></script>
+    <script defer src="./config.js?v=moderacion1"></script>
+    <script type="module" src="./src/app.js?v=moderacion1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -205,6 +205,11 @@
       </section>
       <section id="admin" class="panel pad" hidden>
         <h2>Administración</h2>
+        <section id="photoModeration" aria-labelledby="moderationTitle" hidden>
+          <h3 id="moderationTitle">Fotos pendientes</h3>
+          <p id="moderationStatus" role="status"></p>
+          <div id="pendingPhotos"></div>
+        </section>
         <details>
           <summary>Diagnóstico de conexión</summary>
           <p id="diag"></p>

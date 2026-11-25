@@ -238,7 +238,140 @@ assert.equal(
   (await db.query('select * from public.adrio_comments')).rows.length,
   0,
 )
+await db.exec('reset role')
+await db.exec(
+  await readFile(
+    new URL('../migrations/004_photo_moderation.sql', import.meta.url),
+    'utf8',
+  ),
+)
+assert.equal(
+  (await db.query('select * from public.adrio_photo_index()')).rows.length,
+  3,
+)
+await db.exec('truncate adrio_private.daily_photos')
+const rpc = (name, id) => db.query('select public.adrio_' + name + '($1)', [id])
+const date = path.slice(0, 10)
+const pending = async () =>
+  (await db.query('select * from public.adrio_pending_photos()')).rows
+const index = async () =>
+  (await db.query('select * from public.adrio_photo_index()')).rows
+const remove = (slot) =>
+  db.query('select public.adrio_remove_photo($1,$2::smallint)', [date, slot])
+const anon = () =>
+  db.exec('reset role; set role anon; reset request.jwt.claim.sub')
+const admin = () =>
+  db.exec(
+    `reset role; set role authenticated; set request.jwt.claim.sub='${owner}'`,
+  )
+const newUpload = () => add(crypto.randomUUID())
+const visitorId = crypto.randomUUID()
+await anon()
+assert.equal((await add(visitorId)).rows[0].path, 'pendiente')
+assert.equal((await add(visitorId)).rows[0].path, 'pendiente')
+assert.equal((await index()).length, 0)
+assert.equal(
+  (await db.query('select public.adrio_photo($1,1::smallint) as b', [date]))
+    .rows[0].b,
+  null,
+)
+for (const role of ['anon', 'authenticated']) {
+  await db.exec('reset role; set role ' + role)
+  await assert.rejects(db.query('select * from adrio_private.photo_queue'), {
+    code: '42501',
+  })
+  await assert.rejects(pending(), { code: '42501' })
+  for (const name of ['pending_photo', 'approve_photo', 'reject_photo'])
+    await assert.rejects(rpc(name, visitorId), { code: '42501' })
+  await assert.rejects(remove(1), { code: '42501' })
+}
+await admin()
+const queue = await pending()
+assert.equal(queue.length, 1)
+const first = queue[0].id
+assert.deepEqual(
+  Buffer.from(
+    (await rpc('pending_photo', first)).rows[0].adrio_pending_photo,
+    'base64',
+  ),
+  jpeg,
+)
+await rpc('approve_photo', first)
+assert.equal((await index())[0].slot, 1)
+await anon()
+assert.equal((await add(visitorId)).rows[0].path, date + '/1.jpg')
+await newUpload()
+await newUpload()
+await admin()
+const [second, third] = await pending()
+assert.equal((await newUpload()).rows[0].path, date + '/2.jpg')
+assert.equal((await newUpload()).rows[0].path, date + '/3.jpg')
+await assert.rejects(rpc('approve_photo', second.id), /tres fotos/)
+await anon()
+await assert.rejects(newUpload(), /tres fotos/)
+await admin()
+await remove(2)
+await rpc('approve_photo', second.id)
+assert.deepEqual(
+  (await index()).map((r) => r.slot),
+  [1, 2, 3],
+)
+await rpc('reject_photo', third.id)
+assert.equal((await pending()).length, 0)
+await remove(1)
+await assert.rejects(remove(1), /no existe/)
+await db.exec('reset role')
+await entry()
+await db.query(
+  'insert into adrio_private.daily_photos(taken,slot,request_id,legacy) values($1,1,gen_random_uuid(),$2)',
+  [date, photo],
+)
+await admin()
+await remove(1)
+assert.equal(
+  (await db.query('select photo from public.adrio_diary')).rows[0].photo,
+  photo,
+)
+assert.equal((await db.query('select * from storage.objects')).rows.length, 1)
+assert.equal((await newUpload()).rows[0].path, date + '/1.jpg')
+await db.query(
+  "insert into public.adrio_diary(observed,phase,title,body,photo) values($1,'foundation','Foto','Detalle',$2)",
+  [date, date + '/1.jpg'],
+)
+await remove(1)
+assert.equal(
+  (await db.query("select photo from public.adrio_diary where title='Foto'"))
+    .rows[0].photo,
+  null,
+)
+for (let day = 0; day < 3; day++) {
+  await anon()
+  for (let i = 0; i < 10; i++)
+    assert.equal((await newUpload()).rows[0].path, 'pendiente')
+  if (day === 0)
+    await assert.rejects(newUpload(), /pendientes de hoy está llena/)
+  await db.exec('reset role')
+  await db.query(
+    'update adrio_private.photo_queue set submitted_on=$1::date-$2::int where submitted_on=$1::date',
+    [date, day + 1],
+  )
+}
+await anon()
+await assert.rejects(newUpload(), /pendientes está llena/)
+await admin()
+assert.equal((await pending()).length, 30)
+assert.equal((await newUpload()).rows[0].path, date + '/1.jpg')
+const olderDay = (await pending()).find(
+  (row) => String(row.submitted_on) !== date,
+)
+await rpc('approve_photo', olderDay.id)
+assert.equal(
+  (await index()).find(
+    (row) => String(row.taken) === String(olderDay.submitted_on),
+  ).slot,
+  1,
+)
 await db.close()
 console.log(
-  'Three migrations passed, including the shared photo limit, retries and comment permissions.',
+  'Four migrations passed, including photo moderation, permissions and queue limits.',
 )

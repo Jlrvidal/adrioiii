@@ -349,7 +349,10 @@ export function diary(api, changed) {
     $('publishEntry').disabled = true
     try {
       if (blob && !draft.uploaded) {
-        draft.name = await addPhoto(db, blob, draft.uploadId)
+        const path = await addPhoto(db, blob, draft.uploadId)
+        if (!dailyPath.test(path))
+          throw Error('No se pudo publicar como administrador.')
+        draft.name = path
         draft.uploaded = true
       }
       const name = draft.name
@@ -372,6 +375,7 @@ export function diary(api, changed) {
       $('publishEntry').disabled = false
     }
   }
+  window.addEventListener('adrio-photo-removed', refresh)
   return {
     refresh,
     get rows() {
