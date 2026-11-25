@@ -196,3 +196,14 @@ export function decode(raw) {
   })
   return validate(next)
 }
+// A confirmed historical correction is explicit and publishes a new revision.
+// Other locked phases remain fixed and can veto the correction.
+export function correctMilestone(state, i, start, end) {
+  check(state.completed[i], 'Solo se pueden corregir hitos confirmados.')
+  const next = structuredClone(state)
+  for (const mode of modes) {
+    Object.assign(next.plans[mode][i], { s: start, d: end - start })
+    propagate(next.plans[mode], state.plans[mode], mode, i, state.completed)
+  }
+  return validate(next)
+}

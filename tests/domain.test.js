@@ -83,6 +83,30 @@ test('Reject API paths and privileged key formats', () => {
     owner: 'c7bad662-fa5d-445d-a219-ed1976c58e84',
   }
   assert.equal(settings(c).url, c.url)
-  assert.throws(() => settings({ ...c, url: c.url + '/rest/v1/' }))
+  assert.equal(settings({ ...c, url: c.url + '/rest/v1/' }).url, c.url)
+  assert.equal(settings({ ...c, url: c.url + '/auth/v1' }).normalized, true)
+  for (const path of ['/rest/v2', '/prefix/rest/v1', '/rest/v1/?q=1'])
+    assert.throws(() => settings({ ...c, url: c.url + path }))
   assert.throws(() => settings({ ...c, key: 'sb_secret_example' }))
+})
+
+test('Year segments change precisely at January and baseline is immutable', async () => {
+  const { yearParts } = await import('../src/phases.js')
+  assert.deepEqual(yearParts(offsetOf('2027-09'), 6), [
+    { year: 2027, months: 4 },
+    { year: 2028, months: 2 },
+  ])
+  const original = defaults()
+  edit(original, 'optimista', 0, 0, 6)
+  assert.deepEqual(original, defaults())
+})
+
+test('Explicit corrections to actual dates move future work in both scenarios and preserve other locked phases', async () => {
+  const { correctMilestone } = await import('../src/schedule.js')
+  const a = complete(defaults(), 'optimista', 0)
+  const b = correctMilestone(a, 0, 0, 5)
+  for (const m of ['optimista', 'pesimista'])
+    assert.equal(b.plans[m][1].s, a.plans[m][1].s + 2)
+  const locked = complete(a, 'optimista', 1)
+  assert.throws(() => correctMilestone(locked, 0, 0, 9))
 })

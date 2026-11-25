@@ -377,3 +377,893 @@ details summary {
     font-size: 0.68rem;
   }
 }
+/* Residential portal: editorial type, a sectional drawing and a calendar palette. */
+:root {
+  --bg: #f8f7f2;
+  --paper: #fffefa;
+  --ink: #20382f;
+  --muted: #52665d;
+  --line: #d6dcd1;
+  --tint: #e9eee5;
+  --accent: #1d644e;
+  --marker: #ae482e;
+  --year0: #53697b;
+  --year1: #28758a;
+  --year2: #795e88;
+  --year3: #946026;
+  --year4: #387568;
+  --gap: clamp(16px, 2.3vw, 32px);
+  --display: Georgia, 'Times New Roman', serif;
+  --radius: 5px;
+  --shadow: 0 4px 18px #152b2010;
+}
+:root[data-theme='dark'] {
+  --bg: #14201e;
+  --paper: #1b2a26;
+  --ink: #f0f0e2;
+  --muted: #b6c4b8;
+  --line: #354b42;
+  --tint: #22382e;
+  --accent: #a0d7b6;
+  --marker: #e89970;
+  --year0: #526c80;
+  --year1: #28748b;
+  --year2: #785e89;
+  --year3: #93622e;
+  --year4: #387969;
+}
+body {
+  font:
+    15px/1.45 system-ui,
+    sans-serif;
+}
+header {
+  background: var(--bg);
+}
+.wrap {
+  width: min(1220px, 92vw);
+}
+.top {
+  min-height: 62px;
+  gap: 8px;
+}
+.brand {
+  font: 600 26px var(--display);
+  letter-spacing: -1px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand em {
+  font-weight: 400;
+}
+.navlinks {
+  display: flex;
+  gap: 28px;
+}
+.navlinks a {
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+.navlinks a:hover {
+  text-decoration: underline;
+}
+nav select,
+nav button {
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.cover {
+  margin-top: 22px;
+  background: #193c32;
+  color: #f5f3df;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.covertext {
+  padding: clamp(22px, 3.2vw, 44px);
+}
+.kicker,
+.eyelabel {
+  font:
+    650 11px/1.35 system-ui,
+    sans-serif;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.cover .kicker {
+  color: #c6d9bd;
+}
+.cover h1 {
+  font: normal clamp(44px, 4.3vw, 64px) / 1 var(--display);
+  letter-spacing: -0.045em;
+  margin: 9px 0;
+}
+.cover h1 i {
+  font-weight: 400;
+  color: #d4e4bc;
+}
+.cover p {
+  color: #e5e8db;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.coverstatus {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+.cover #status {
+  font-size: 11px;
+  color: #edf5dc;
+  border: 1px solid #66816c;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.cover #stamp {
+  font-size: 11px;
+  color: #ccdbcf;
+}
+.cover figure {
+  margin: 0;
+  position: relative;
+  display: grid;
+  place-content: center;
+  background: #1b3d34;
+  overflow: hidden;
+  border-left: 1px solid #567363;
+}
+.cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 246px;
+}
+.cover figcaption {
+  position: absolute;
+  bottom: 6px;
+  right: 14px;
+  color: #cddece;
+  font: 10px system-ui;
+  letter-spacing: 0.07em;
+}
+.outlook {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.9fr;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+.outlook article {
+  background: transparent;
+  margin: 20px 0;
+  padding: 0 var(--gap);
+  border-left: 1px solid var(--line);
+}
+.outlook article:first-child {
+  border: 0;
+  padding-left: 0;
+}
+.outlook strong {
+  display: block;
+  font: normal clamp(24px, 2.6vw, 38px) / 1.15 var(--display);
+  letter-spacing: -0.045em;
+  margin: 5px 0;
+}
+.eyelabel {
+  color: var(--muted);
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.dot {
+  display: inline-block;
+  border-radius: 100%;
+  width: 8px;
+  height: 8px;
+}
+.teal {
+  background: #348365;
+}
+.amber {
+  background: #b78037;
+}
+.outlook small {
+  font-size: 12px;
+}
+.brief {
+  display: flex;
+  gap: var(--gap);
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.brief > div {
+  flex: 1;
+}
+.brief p {
+  margin: 1px 0;
+  font-weight: 570;
+}
+.brief small,
+.entry small {
+  font-size: 12px;
+}
+.sectionTitle,
+.toolbar,
+.chartfoot,
+.upcoming {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sectionTitle {
+  margin-bottom: 14px;
+}
+.kicker {
+  color: var(--accent);
+}
+h2 {
+  font: normal clamp(25px, 2.45vw, 35px) / 1.15 var(--display);
+  letter-spacing: -0.035em;
+  margin: 3px 0;
+}
+h3 {
+  font: normal 23px/1.2 var(--display);
+  margin: 8px 0;
+}
+.planning,
+.journal,
+#evolucion,
+.upcoming {
+  margin: 30px 0;
+}
+.toolbar {
+  background: var(--tint);
+  font-size: 13px;
+  padding: 6px 10px;
+  justify-content: flex-start;
+  border-top: 1px solid var(--line);
+}
+.toolbar label {
+  margin-left: auto;
+}
+.toolbar button {
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  min-height: 36px;
+}
+.toolbar button[aria-pressed='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+button,
+.button,
+select {
+  border-radius: var(--radius);
+  min-height: 36px;
+}
+.tabs {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 3px;
+  background: var(--paper);
+}
+.tabs button {
+  border: 0;
+  padding: 5px 12px;
+  font-size: 13px;
+  min-height: 34px;
+}
+.scroll {
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  gap: 0 8px;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  line-height: 1.2;
+  padding: 10px 14px;
+}
+.caption small {
+  flex-basis: 100%;
+  font-size: 10.5px;
+  margin-top: 3px;
+}
+.phaseIcon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+.track {
+  min-height: 49px;
+  background: none;
+}
+.row {
+  border-color: color-mix(in srgb, var(--line) 65%, transparent);
+}
+.bar,
+.secondBar {
+  z-index: 1;
+  border-radius: 3px;
+  align-items: center;
+  display: flex;
+  padding: 0 4px;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  height: 23px;
+  overflow: hidden;
+}
+.bar.done {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.bar.over {
+  outline: 1px dashed var(--marker);
+  outline-offset: 1px;
+}
+.secondBar {
+  position: absolute;
+  height: 16px;
+  bottom: 4px;
+  opacity: 0.89;
+  border: 1px dashed white;
+}
+.firstBar {
+  top: 4px;
+  height: 19px;
+}
+.baseBar {
+  position: absolute;
+  border-bottom: 2px dashed var(--ink);
+  bottom: 2px;
+  z-index: 1;
+}
+.baseBar.pesimista {
+  bottom: 0;
+}
+.years span {
+  color: white;
+  font-weight: 700;
+  padding: 4px 7px;
+}
+.months span {
+  border: 0;
+  padding: 3px 4px;
+  color: var(--muted);
+}
+.yearline {
+  opacity: 0.09;
+}
+.todayline {
+  z-index: 2;
+  border-left: 2px solid var(--marker);
+}
+.todayline b {
+  display: inline-block;
+  background: var(--marker);
+  color: white;
+  padding: 2px 5px;
+  letter-spacing: 0.08em;
+}
+.overlay {
+  z-index: auto;
+}
+.bar.editable {
+  cursor: grab;
+}
+.handle {
+  height: 100%;
+  touch-action: none;
+}
+.chartfoot {
+  padding: 10px 0;
+  color: var(--muted);
+}
+#yearKey {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+}
+#yearKey span:before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--swatch);
+  margin-right: 5px;
+}
+.method {
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 0 15px;
+}
+.method p {
+  max-width: 74ch;
+}
+.upcoming {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 24px;
+}
+#milestones {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+#milestones > div {
+  border-left: 2px solid var(--accent);
+  padding-left: 12px;
+  max-width: 230px;
+}
+#milestones strong {
+  display: block;
+  font-size: 14px;
+}
+.phaseItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 14px;
+  background: var(--paper);
+}
+.phaseItem > span:first-of-type {
+  flex: 1;
+}
+.phaseItem span span,
+.phaseItem strong,
+.phaseItem small {
+  display: block;
+}
+.phaseItem strong {
+  margin: 2px 0;
+}
+.phaseItem > svg {
+  padding: 6px;
+  box-sizing: content-box;
+  background: var(--tint);
+  border-radius: 50%;
+}
+.empty {
+  color: var(--muted);
+  padding: 20px;
+  background: var(--tint);
+  border-left: 3px solid var(--accent);
+}
+.journal select {
+  font-size: 13px;
+}
+.journal label {
+  font-size: 13px;
+}
+#entries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+  gap: 16px;
+}
+.entry {
+  padding: 16px;
+  background: var(--paper);
+  border-top: 2px solid var(--accent);
+}
+.entry small,
+.entry label {
+  display: block;
+  margin: 6px 0;
+}
+.entry p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.thumbnail {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
+.thumbnail img {
+  display: block;
+  width: 100%;
+  height: 195px;
+  object-fit: cover;
+}
+dialog img {
+  max-width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+}
+dialog figure {
+  margin: 8px 0;
+}
+textarea {
+  width: 100%;
+  min-height: 80px;
+  font: inherit;
+}
+#photoBody {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#photoBody figure {
+  flex: 1 1 150px;
+}
+#forecasts svg {
+  width: 100%;
+  max-height: 210px;
+  display: block;
+}
+#forecasts polyline {
+  fill: none;
+  stroke-width: 3;
+}
+#forecasts .optimista {
+  stroke: var(--accent);
+}
+#forecasts .pesimista {
+  stroke: var(--year3);
+  stroke-dasharray: 5 3;
+}
+#forecasts text {
+  font: 12px system-ui;
+  fill: var(--muted);
+}
+footer {
+  border-top: 1px solid var(--line);
+}
+.entry,
+.brief,
+.outlook,
+#phaseBody {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 720px) {
+  .navlinks {
+    display: none;
+  }
+  .covertext {
+    padding: 18px;
+  }
+  .cover {
+    margin-top: 12px;
+  }
+  .coverstatus {
+    margin-top: 8px;
+  }
+  .cover figure {
+    align-content: center;
+  }
+  .cover figcaption {
+    font-size: 8px;
+  }
+  .outlook article {
+    padding: 0 10px;
+  }
+  .outlook strong {
+    font-size: 23px;
+  }
+  .outlook small {
+    font-size: 11px;
+  }
+  .eyelabel {
+    font-size: 9px;
+  }
+  .brief {
+    font-size: 13px;
+  }
+  .planning,
+  .journal,
+  #evolucion,
+  .upcoming {
+    margin: 23px 0;
+  }
+  .chartfoot small {
+    font-size: 11px;
+  }
+}
+@media (max-width: 600px) {
+  .wrap {
+    width: 94%;
+  }
+  .top {
+    min-height: 53px;
+  }
+  .brand {
+    font-size: 22px;
+  }
+  .cover {
+    display: block;
+  }
+  .covertext {
+    position: relative;
+    z-index: 1;
+    width: 76%;
+    padding: 16px 13px;
+  }
+  .cover h1 {
+    font-size: 41px;
+  }
+  .cover p {
+    font-size: 12px;
+  }
+  .cover .kicker {
+    font-size: 9px;
+  }
+  .cover figure {
+    position: absolute;
+    right: -30px;
+    top: 6px;
+    width: 45%;
+    height: 125px;
+    border: 0;
+    background: transparent;
+    opacity: 0.75;
+  }
+  .cover figcaption {
+    display: none;
+  }
+  .coverstatus {
+    width: 130%;
+    gap: 4px;
+  }
+  .cover #stamp {
+    font-size: 10px;
+  }
+  .outlook {
+    grid-template-columns: 1fr 1fr;
+  }
+  .outlook article {
+    margin: 12px 0;
+  }
+  .outlook article:nth-child(3) {
+    grid-column: 1/-1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 0;
+    padding: 8px 0;
+  }
+  .outlook article:nth-child(3) strong {
+    font: 650 14px system-ui;
+    letter-spacing: normal;
+  }
+  .brief {
+    padding: 8px 0;
+    gap: 8px;
+  }
+  .brief small {
+    font-size: 10px;
+  }
+  .brief p {
+    font-size: 12px;
+  }
+  .toolbar {
+    gap: 3px;
+    font-size: 12px;
+    padding: 4px;
+  }
+  .toolbar button,
+  .tabs button {
+    font-size: 12px;
+    padding: 5px 8px;
+    min-height: 40px;
+  }
+  .sectionTitle {
+    gap: 8px;
+  }
+  .toolbar label {
+    margin-left: 2px;
+  }
+  .phaseItem {
+    padding: 10px;
+  }
+  .caption {
+    padding: 6px;
+    gap: 3px;
+    font-size: 12px;
+  }
+  .caption .phaseIcon {
+    width: 15px;
+    height: 15px;
+  }
+  .caption small {
+    font-size: 10px;
+  }
+  #milestones {
+    gap: 12px;
+  }
+  .planning .sectionTitle {
+    align-items: flex-start;
+  }
+  #phaseList {
+    max-height: 460px;
+    overflow: auto;
+  }
+  .journey {
+    overflow-x: auto;
+  }
+  nav {
+    gap: 4px;
+  }
+  .covertext br {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+.journey {
+  display: flex;
+  gap: 1px;
+  border-block: 1px solid var(--line);
+  padding: 10px 0;
+}
+.journey button {
+  flex: 1;
+  min-width: 95px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--line);
+  font-size: 12px;
+}
+.journey strong,
+.journey small {
+  display: block;
+}
+.journey small {
+  font-size: 10px;
+}
+.journey button:last-child {
+  border: 0;
+}
+#entryForm img,
+.entry img {
+  border-radius: var(--radius);
+}
+.coverstatus #stamp {
+  font-variant-numeric: tabular-nums;
+}
+.months .qStart {
+  border-left: 1px solid var(--muted);
+  font-weight: 700;
+}
+.cover figure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cover img {
+  max-width: 530px;
+  object-fit: contain;
+}
+.coverstatus #stamp {
+  color: #dde6d8;
+}
+.coverstatus:has(#status:empty) {
+  display: none;
+}
+@media (max-width: 600px) {
+  .cover figure {
+    right: -2%;
+    width: 37%;
+    top: 18px;
+    height: 100px;
+    opacity: 0.88;
+  }
+  .covertext {
+    width: 75%;
+  }
+  .top {
+    flex-wrap: nowrap;
+  }
+  .top nav {
+    flex-wrap: nowrap;
+  }
+  .top nav label {
+    font-size: 0;
+  }
+  .top nav select,
+  .top nav button {
+    font-size: 11px;
+    padding: 5px 7px;
+  }
+  .covertext br {
+    display: inline;
+  }
+  .covertext .kicker {
+    letter-spacing: 0.075em;
+  }
+  .outlook article small {
+    display: block;
+    line-height: 1.35;
+  }
+  .brief > div {
+    min-width: 0;
+  }
+}
+#milestones details {
+  flex-basis: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}
+.entry .thumbnail {
+  background: var(--tint);
+  box-shadow: var(--shadow);
+}
+.entry .thumbnail img {
+  object-fit: contain;
+}
+.entry:has(.thumbnail) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 20px;
+  align-content: start;
+}
+.entry:has(.thumbnail) > * {
+  grid-column: 1;
+}
+.entry:has(.thumbnail) .thumbnail {
+  grid-column: 2;
+  grid-row: 1 / span 6;
+}
+.entry > button:not(.thumbnail) {
+  justify-self: start;
+}
+@media (max-width: 600px) {
+  .entry:has(.thumbnail) {
+    display: block;
+  }
+  .entry .thumbnail img {
+    height: 165px;
+  }
+}
+.gridhead {
+  padding-top: 15px;
+}
+.todayline b {
+  vertical-align: top;
+}
+.dual .baseBar.optimista {
+  bottom: auto;
+  top: 25px;
+}
+.dual .baseBar.pesimista {
+  bottom: 1px;
+}
+#compareKey {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0;
+}

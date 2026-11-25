@@ -4,6 +4,7 @@ import {
   phases,
   edit,
   complete,
+  correctMilestone,
   decode,
   delivery,
   today,
@@ -14,11 +15,22 @@ import {
 import { connect } from './backend.js'
 import { ScheduleStore } from './sync.js'
 import { renderChart, element } from './chart.js'
+import { diary } from './diary.js'
+import { overview, forecasts } from './overview.js'
 const $ = (id) => document.getElementById(id)
 let mode =
   new URL(location.href).searchParams.get('escenario') === 'pesimista'
     ? 'pesimista'
     : 'optimista'
+let visitorPreview = false,
+  compare = new URL(location.href).searchParams.get('escenario') === 'comparar',
+  listView = matchMedia('(max-width:640px)').matches,
+  baseView = false,
+  publicationSeries = [],
+  book,
+  extraVersion = 0,
+  extraLoading = false,
+  lastExtra = -1
 let api,
   store,
   configError = '',
@@ -102,29 +114,74 @@ function manual(state, enabled) {
         commit(complete(state, mode, i))
     })
     row.append(done)
+    if (state.completed[i]) {
+      const correction = element('details'),
+        summary = element('summary', 'Corregir fechas confirmadas')
+      correction.append(summary)
+      const dates = ['Inicio real', 'Fin real'].map((title, j) => {
+        const label = element('label', title),
+          input = element('input')
+        input.type = 'month'
+        input.value = monthISO(p.s + (j ? p.d : 0))
+        label.append(input)
+        correction.append(label)
+        return input
+      })
+      const apply = element('button', 'Revisar corrección')
+      apply.onclick = safe(() => {
+        const next = correctMilestone(
+          state,
+          i,
+          ...dates.map((input) => offsetOf(input.value)),
+        )
+        inspect(next)
+      })
+      correction.append(apply)
+      row.append(correction)
+    }
     $('manual').append(row)
   })
 }
 let lastState, lastMode, lastEnabled, lastDay
 function render() {
-  const state = store?.state ?? fallback,
+  if (store?.editing) return
+  const state = (visitorPreview ? store?.published : store?.state) ?? fallback,
     now = today(),
     plan = state.plans[mode],
     enabled = Boolean(
-      store?.admin && store.revision !== null && !store.conflict,
+      !visitorPreview &&
+        store?.admin &&
+        store.revision !== null &&
+        !store.conflict,
     )
   $('status').textContent =
-    configError || store?.message || 'Calendario inicial'
+    store?.draft && !visitorPreview
+      ? 'Borrador sin publicar'
+      : store?.stamp
+        ? store.source === 'cached'
+          ? 'Última publicación disponible'
+          : 'Publicación sincronizada'
+        : 'Calendario orientativo inicial, pendiente de publicación.'
+  $('diag').textContent =
+    configError ||
+    (api?.normalized ? 'Se normalizó la ruta de la API. ' : '') +
+      (store?.message || 'Sin conexión')
+  book?.setAdmin(Boolean(store?.admin && !visitorPreview))
+  $('forecastNote').hidden = !store?.admin || publicationSeries.length === 0
   $('stamp').textContent = store?.stamp
-    ? 'Última publicación · ' +
-      new Date(store.stamp).toLocaleString('es-ES', {
+    ? 'Actualizado el ' +
+      new Date(store.stamp).toLocaleDateString('es-ES', {
+        dateStyle: 'long',
         timeZone: 'Europe/Madrid',
       })
-    : 'Sin actualización remota confirmada'
+    : store?.loadFailed || configError
+      ? 'No se ha podido actualizar el seguimiento.'
+      : 'Consultando la publicación…'
   $('login').hidden = signedIn
   $('logout').hidden = !signedIn
-  $('admin').hidden = !store?.admin
-  $('login').disabled = !api
+  $('admin').hidden = !store?.admin || visitorPreview
+  $('returnEdit').hidden = !store?.admin || !visitorPreview
+  $('login').disabled = false
   $('discard').disabled = !store?.draft || store.busy
   $('reset').disabled =
     $('import').disabled =
@@ -133,58 +190,101 @@ function render() {
   $('draft').textContent = store?.draft
     ? 'Vista del borrador local pendiente de publicación.'
     : 'Vista de la última publicación.'
-  for (const m of modes) $(m).setAttribute('aria-pressed', String(m === mode))
-  $('early').textContent = format(delivery(state.plans.optimista))
-  $('late').textContent = format(delivery(state.plans.pesimista))
-  $('count').textContent = state.completed.filter(Boolean).length + ' de 7'
+  for (const m of [...modes, 'comparar'])
+    $(m).setAttribute(
+      'aria-pressed',
+      String(m === (compare ? 'comparar' : mode)),
+    )
   $('today').textContent =
     'Hoy · ' +
     new Date().toLocaleDateString('es-ES', {
       dateStyle: 'long',
       timeZone: 'Europe/Madrid',
     })
-  $('current').textContent =
-    plan
-      .flatMap((p, i) =>
-        !state.completed[i] && p.s <= now && now < p.s + p.d
-          ? [phases[i][1]]
-          : [],
-      )
-      .join(' · ') || 'Sin actividad prevista'
-  const next = plan
-    .map((p, i) => ({ end: p.s + p.d, i }))
-    .filter((p) => !state.completed[p.i] && p.end > now)
-    .sort((a, b) => a.end - b.end)[0]
-  $('next').textContent = next
-    ? phases[next.i][1] + ' · ' + format(next.end)
-    : 'Sin hitos futuros'
-  $('remaining').textContent =
-    Math.max(0, Math.ceil(delivery(plan) - now)) + ' meses'
+  $('gantt').setAttribute('aria-pressed', String(!listView))
+  $('vertical').setAttribute('aria-pressed', String(listView))
+  document.querySelector('.scroll').hidden = listView
+  $('phaseList').hidden = !listView
+  $('goToday').hidden = listView
+  $('yearKey').hidden = listView
+  $('compareKey').hidden = !compare || listView
   if (
     lastState !== state ||
     lastMode !== mode ||
     lastEnabled !== enabled ||
-    lastDay !== now
+    lastDay !== now ||
+    lastExtra !== extraVersion
   ) {
-    renderChart($('chart'), state, mode, now, enabled, {
+    const detail = overview(
+      state,
+      mode,
+      now,
+      Boolean(store?.stamp),
+      book?.rows ?? [],
+      publicationSeries,
+      compare,
+      baseView,
+    )
+    renderChart($('chart'), state, mode, now, enabled && !compare, {
+      compare,
+      baseline: baseView,
+      detail,
       lock: (v) => {
         store.editing = v
       },
       commit: safe(commit),
       warn,
     })
-    manual(state, enabled)
+    manual(state, enabled && !compare)
     lastState = state
     lastMode = mode
     lastEnabled = enabled
+    lastExtra = extraVersion
     lastDay = now
   }
 }
-for (const m of modes)
+for (const m of [...modes, 'comparar'])
   $(m).onclick = () => {
-    mode = m
+    compare = m === 'comparar'
+    mode = compare ? 'optimista' : m
+    extraVersion++
     render()
   }
+$('viewAsVisitor').onclick = () => {
+  visitorPreview = true
+  extraVersion++
+  render()
+  window.scrollTo(0, 0)
+}
+$('returnEdit').onclick = () => {
+  visitorPreview = false
+  extraVersion++
+  render()
+  $('admin').scrollIntoView()
+}
+$('gantt').onclick = () => {
+  listView = false
+  render()
+}
+$('vertical').onclick = () => {
+  listView = true
+  render()
+}
+$('baseline').onchange = () => {
+  baseView = $('baseline').checked
+  extraVersion++
+  render()
+}
+$('goToday').onclick = () => {
+  const pane = document.querySelector('.scroll'),
+    marker = document.querySelector('.todayline'),
+    label = document.querySelector('.caption')
+  if (marker)
+    pane.scrollLeft +=
+      marker.getBoundingClientRect().left -
+      pane.getBoundingClientRect().left -
+      (pane.clientWidth + label.clientWidth) / 2
+}
 try {
   api = connect(window.ADRIO, window.supabase)
   const storage = {
@@ -193,9 +293,77 @@ try {
     removeItem: (k) => localStorage.removeItem(k),
   }
   store = new ScheduleStore(api, storage, render)
+  store.loadCache()
 } catch (e) {
-  configError = 'Calendario inicial · ' + e.message
+  configError = e.message
+  if (!window.ADRIO) {
+    const cachedStore = new ScheduleStore(
+      {
+        scope: document.querySelector('meta[name=adrio-cache-origin]').content,
+      },
+      localStorage,
+      render,
+    )
+    cachedStore.loadCache()
+    if (cachedStore.stamp) store = cachedStore
+  }
 }
+book = diary(api, () => {
+  extraVersion++
+  render()
+})
+async function extras() {
+  if (extraLoading || document.hidden || store?.editing || viewingEdit()) return
+  extraLoading = true
+  try {
+    await Promise.all([
+      book.refresh(),
+      (async () => {
+        if (!api) {
+          forecasts([], true)
+          return
+        }
+        const data = []
+        let error
+        for (let from = 0; ; from += 200) {
+          const page = await api.db
+            .rpc('adrio_forecasts')
+            .order('revision')
+            .range(from, from + 199)
+          if (page.error || !Array.isArray(page.data)) {
+            error = true
+            break
+          }
+          data.push(...page.data)
+          if (page.data.length < 200) break
+        }
+        if (!error && Array.isArray(data))
+          publicationSeries = data.filter(
+            (r) =>
+              Number.isInteger(r.optimista) &&
+              Number.isInteger(r.pesimista) &&
+              Number.isFinite(Date.parse(r.published_at)),
+          )
+        forecasts(publicationSeries, Boolean(error))
+        extraVersion++
+        render()
+      })(),
+    ])
+  } finally {
+    extraLoading = false
+  }
+}
+$('forecastNote').onsubmit = safe(async (e) => {
+  e.preventDefault()
+  const { error } = await api.db
+    .from('adrio_forecast_notes')
+    .upsert({ revision: store.revision, reason: $('reason').value.trim() })
+  if (error)
+    throw Error(
+      'No se pudo guardar la explicación. Comprueba la revisión publicada.',
+    )
+  await extras()
+})
 function viewingEdit() {
   return Boolean(
     document.querySelector('dialog[open]') ||
@@ -203,13 +371,16 @@ function viewingEdit() {
   )
 }
 function refresh() {
-  if (!document.hidden && !viewingEdit()) store?.refresh()
+  if (api && !document.hidden && !viewingEdit()) store?.refresh()
 }
 async function verifyOwner(seq) {
   try {
     const ok = await api.authorized()
     if (seq !== identity) return
+    api.owner = ok === true ? checkedUser : null
     store.authorize(ok === true)
+    $('notice').textContent =
+      ok === true ? '' : 'Sesión con acceso de solo lectura.'
     await store.refresh()
   } catch {
     if (seq === identity) {
@@ -227,30 +398,40 @@ if (api) {
     signedIn = Boolean(uid)
     if (uid !== checkedUser || !uid) {
       store.authorize(false)
+      api.owner = null
+      $('notice').textContent = ''
       for (const id of ['versions', 'preview']) $(id).close()
     }
+    if (!uid) visitorPreview = false
     checkedUser = uid
     render()
-    if (uid === api.owner) setTimeout(() => verifyOwner(seq), 0)
-    else if (uid) $('notice').textContent = 'Sesión con acceso de solo lectura.'
+    if (uid) setTimeout(() => verifyOwner(seq), 0)
     else if (event === 'SIGNED_OUT') store.refresh()
   })
   refresh()
   window.addEventListener('online', () => {
-    if (checkedUser === api.owner && !store.admin) verifyOwner(identity)
+    if (checkedUser && !store.admin) verifyOwner(identity)
     else refresh()
   })
   document.addEventListener('visibilitychange', refresh)
 }
 render()
+extras().then(() => {
+  if (/^#observacion-[a-f0-9-]{36}$/.test(location.hash))
+    document.getElementById(location.hash.slice(1))?.scrollIntoView()
+})
 setInterval(() => {
   if (!document.hidden && !store?.editing) {
     render()
     refresh()
+    extras()
   }
 }, 60000)
 $('login').onclick = () => {
-  $('autherror').textContent = ''
+  $('autherror').textContent = api
+    ? ''
+    : 'El acceso está temporalmente fuera de servicio.'
+  $('enter').disabled = !api
   $('auth').showModal()
 }
 $('auth').onclose = () => {
@@ -264,6 +445,7 @@ $('visible').onchange = () => {
 $('cancel').onclick = () => $('auth').close()
 $('authform').onsubmit = async (e) => {
   e.preventDefault()
+  if (!api) return
   $('enter').disabled = true
   $('autherror').textContent = 'Verificando…'
   try {
@@ -298,7 +480,7 @@ $('discard').onclick = safe(() => {
 })
 function shareURL() {
   const u = new URL(location.pathname, location.origin)
-  u.searchParams.set('escenario', mode)
+  u.searchParams.set('escenario', compare ? 'comparar' : mode)
   return u.href
 }
 $('copy').onclick = safe(async () => {
@@ -309,9 +491,13 @@ $('share').onclick = safe(async () => {
   const url = shareURL(),
     text =
       'Seguimiento de Obra Adrio III · Escenario ' +
-      mode +
+      (compare ? 'comparado' : mode) +
       ' · Entrega estimada: ' +
       format(delivery((store?.published ?? fallback).plans[mode])) +
+      (compare
+        ? ' a ' +
+          format(delivery((store?.published ?? fallback).plans.pesimista))
+        : '') +
       '. Previsión no oficial.'
   if (navigator.share) {
     try {
@@ -404,3 +590,8 @@ $('history').onclick = safe(async () => {
   $('versions').showModal()
 })
 $('close').onclick = () => $('versions').close()
+
+if (!api && !window.ADRIO)
+  window.addEventListener('online', () => location.reload(), { once: true })
+if ('serviceWorker' in navigator && window.isSecureContext)
+  navigator.serviceWorker.register('./sw.js').catch(() => {})

@@ -16,7 +16,13 @@ const server = createServer(async (req, res) => {
         ? 'text/html'
         : path.endsWith('.css')
           ? 'text/css'
-          : 'text/javascript',
+          : path.endsWith('.svg')
+            ? 'image/svg+xml'
+            : path.endsWith('.png')
+              ? 'image/png'
+              : path.endsWith('.webmanifest')
+                ? 'application/manifest+json'
+                : 'text/javascript',
     })
     res.end(data)
   } catch {
@@ -52,7 +58,10 @@ try {
       done: false,
     })),
   }
-  let published = legacy
+  let published = legacy,
+    diaryRows = [],
+    photoPath = '',
+    diaryWrites = 0
   await page.route('https://*.supabase.co/**', async (route) => {
     const req = route.request(),
       path = new URL(req.url()).pathname
@@ -103,11 +112,53 @@ try {
     }
     if (path === '/rest/v1/rpc/adrio_history')
       return send([{ revision: 0, state: legacy, updated_at: stamp }])
+    if (path === '/rest/v1/adrio_diary') {
+      if (req.method() === 'GET') return send(diaryRows)
+      if (uid !== owner) return send({}, 403)
+      const values = req.postDataJSON()
+      diaryWrites++
+      if (req.method() === 'POST') {
+        diaryRows = [
+          { ...values, version: 1, published_at: stamp },
+          ...diaryRows,
+        ]
+        return send({ id: values.id })
+      }
+      if (req.method() === 'PATCH') {
+        Object.assign(diaryRows[0], values, { version: 2 })
+        return send({ id: diaryRows[0].id })
+      }
+      if (req.method() === 'DELETE') {
+        const row = diaryRows.shift()
+        return send({ id: row.id })
+      }
+    }
+    if (path.startsWith('/storage/v1/object/') && req.method() === 'POST') {
+      photoPath = path
+      return send({ Key: path })
+    }
+    if (path.startsWith('/storage/v1/object/') && req.method() === 'GET')
+      return route.fulfill({
+        contentType: 'image/webp',
+        body: Buffer.from(
+          'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v89WAAAAA==',
+          'base64',
+        ),
+      })
+    if (path.startsWith('/storage/v1/object/') && req.method() === 'DELETE')
+      return send([])
+    if (path === '/rest/v1/rpc/adrio_forecasts')
+      return send([
+        { revision: 0, published_at: stamp, optimista: 21, pesimista: 28 },
+      ])
     throw Error(path)
   })
   const url = 'http://127.0.0.1:' + server.address().port + '/'
   await page.goto(url + '?access_token=fixture#sensitive')
-  await page.getByText(/Sin conexión · calendario inicial/).waitFor()
+  await page
+    .locator('#status')
+    .filter({ hasText: 'Calendario orientativo inicial' })
+    .waitFor()
   await page.locator('#pesimista').click()
   assert.equal(
     await page.locator('#pesimista').getAttribute('aria-pressed'),
@@ -135,26 +186,86 @@ try {
   )
   offline = false
   await page.reload()
-  await page.getByText('Publicación sincronizada').waitFor()
-  if (process.env.SHOTS) {
-    await mkdir(process.env.SHOTS, { recursive: true })
-    await page.screenshot({
-      path: process.env.SHOTS + '/desktop.png',
-      fullPage: true,
-    })
+  await page
+    .locator('#status')
+    .filter({ hasText: 'Publicación sincronizada' })
+    .waitFor()
+  async function shot(name) {
+    if (process.env.SHOTS) {
+      await mkdir(process.env.SHOTS, { recursive: true })
+      await page.screenshot({ path: process.env.SHOTS + '/' + name + '.png' })
+    }
   }
-  await page.setViewportSize({ width: 390, height: 844 })
-  assert.ok(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  )
-  if (process.env.SHOTS)
-    await page.screenshot({
-      path: process.env.SHOTS + '/mobile.png',
-      fullPage: true,
-    })
-  await page.setViewportSize({ width: 1440, height: 1000 })
+  for (const [width, height] of [
+    [1440, 900],
+    [1280, 800],
+    [390, 844],
+    [320, 568],
+  ]) {
+    await page.setViewportSize({ width, height })
+    await page.reload()
+    await page
+      .locator('#status')
+      .filter({ hasText: 'Publicación sincronizada' })
+      .waitFor()
+    await page.waitForFunction(
+      () => document.querySelector('.cover img').naturalWidth > 0,
+    )
+    for (const theme of ['light', 'dark']) {
+      await page.locator('#theme').selectOption(theme)
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await shot(width + '-' + theme)
+      assert.ok(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        'Overflow at ' + width,
+      )
+    }
+    if (width === 390) {
+      await page.locator('#phaseList').scrollIntoViewIfNeeded()
+      await shot('mobile-phases')
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.reload()
+  await page.locator('#theme').selectOption('light')
+  await page.locator('#pesimista').click()
+  await page.locator('#chart').scrollIntoViewIfNeeded()
+  await shot('pessimistic')
+  await page.locator('#comparar').click()
+  await page.locator('#baseline').check()
+  assert.equal(await page.locator('.secondBar').count(), 7)
+  assert.equal(await page.locator('.baseBar').count(), 14)
+  assert.equal(writes, 0)
+  await shot('compare')
+  await page.locator('#optimista').click()
+  await page.locator('#baseline').uncheck()
+  await page.locator('#chart').scrollIntoViewIfNeeded()
+  await shot('gantt')
+  await page.locator('#chart button.caption').first().click()
+  await page.locator('#phaseDialog[open]').waitFor()
+  await page.locator('#phaseDialog button').click()
+  await page.locator('#diario').scrollIntoViewIfNeeded()
+  await shot('diary')
+  offline = true
+  await page.reload()
+  await page
+    .locator('#status')
+    .filter({ hasText: 'Última publicación disponible' })
+    .waitFor()
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await shot('cached')
+  await page.evaluate(() => localStorage.clear())
+  await page.reload()
+  await page
+    .locator('#status')
+    .filter({ hasText: 'Calendario orientativo inicial' })
+    .waitFor()
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await shot('fallback')
+  offline = false
+  await page.reload()
   async function login(password) {
     await page.locator('#email').fill('test@example.test')
     await page.locator('#password').fill(password)
@@ -174,6 +285,9 @@ try {
   await page.locator('.handle').first().waitFor()
   await page.reload()
   await page.locator('.handle').first().waitFor()
+  await page.locator('#admin').scrollIntoViewIfNeeded()
+  await shot('admin')
+  await page.locator('#chart').scrollIntoViewIfNeeded()
   const handle = await page.locator('.bar .handle').nth(1).boundingBox()
   await page.mouse.move(handle.x + 6, handle.y + 9)
   await page.mouse.down()
@@ -217,6 +331,65 @@ try {
       'Publicación sincronizada',
   )
   assert.equal(writes, 3)
+  await page.locator('#newEntry').click()
+  await page.locator('#entryTitle').fill('Observación de prueba')
+  await page
+    .locator('#entryText')
+    .fill('Entrada de ensayo en un servicio simulado.')
+  await page.locator('#obState').selectOption('active')
+  await page
+    .locator('#photoFile')
+    .setInputFiles({
+      name: 'wrong.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('invalid'),
+    })
+  await page.locator('#previewEntry').click()
+  await page.locator('#entryError').filter({ hasText: 'formato' }).waitFor()
+  await page
+    .locator('#photoFile')
+    .setInputFiles({
+      name: 'example.png',
+      mimeType: 'image/png',
+      buffer: await readFile(
+        new URL('../assets/icon-192.png', import.meta.url),
+      ),
+    })
+  await page.locator('#previewEntry').click()
+  await page.locator('#publishEntry').waitFor()
+  assert.equal(diaryWrites, 0)
+  await page.locator('#publishEntry').click()
+  await page
+    .locator('.entry h3')
+    .filter({ hasText: 'Observación de prueba' })
+    .waitFor()
+  assert.equal(diaryWrites, 1)
+  assert.ok(photoPath.endsWith('.webp'))
+  await page.reload()
+  await page.locator('.entry h3').waitFor()
+  await page
+    .locator('#manageEntries button')
+    .filter({ hasText: 'Editar' })
+    .click()
+  await page.locator('#entryTitle').fill('Observación revisada')
+  await page.locator('#previewEntry').click()
+  await page.locator('#publishEntry').click()
+  await page.locator('.entry h3').filter({ hasText: 'revisada' }).waitFor()
+  await page.locator('#filter').selectOption('delivery')
+  assert.equal(await page.locator('.entry').count(), 0)
+  await page.locator('#filter').selectOption('')
+  await page.locator('.thumbnail').first().click()
+  await page.locator('#photoDialog[open] img').waitFor()
+  await page.locator('#photoDialog button').click()
+  await page.locator('#diario').scrollIntoViewIfNeeded()
+  await shot('diary-published-fixture')
+  page.once('dialog', (dialog) => dialog.accept())
+  await page
+    .locator('#manageEntries button')
+    .filter({ hasText: 'Retirar' })
+    .click()
+  await page.locator('.entry').waitFor({ state: 'detached' })
+  assert.equal(diaryWrites, 3)
   await page.locator('#history').click()
   await page.locator('#list button').first().click()
   await page.locator('#apply').click()
@@ -229,6 +402,51 @@ try {
   await page.locator('#logout').click()
   await page.locator('#login').waitFor()
   assert.equal(await page.locator('.handle').count(), 0)
+  // Use a second isolated browser context and its own cache, as a new visitor.
+  const publicContext = await browser.newContext({ serviceWorkers: 'allow' })
+  await publicContext.route('https://*.supabase.co/**', (r) => {
+    const path = new URL(r.request().url()).pathname
+    return r.fulfill({
+      json:
+        path === '/rest/v1/schedule'
+          ? { state: published, revision: rev, updated_at: stamp }
+          : [],
+    })
+  })
+  const other = await publicContext.newPage()
+  await other.goto(url)
+  await other
+    .locator('#status')
+    .filter({ hasText: 'Publicación sincronizada' })
+    .waitFor()
+  assert.equal(await other.locator('.handle').count(), 0)
+  await other.evaluate(() => navigator.serviceWorker.ready.then(() => true))
+  await other.reload()
+  await other.waitForFunction(() => !!navigator.serviceWorker.controller)
+  await publicContext.unrouteAll()
+  await publicContext.setOffline(true)
+  await other.reload()
+  await other
+    .locator('#status')
+    .filter({ hasText: 'Última publicación disponible' })
+    .waitFor()
+  await other.locator('#comparar').click()
+  assert.equal(await other.locator('.secondBar').count(), 7)
+  const cached = await other.evaluate(async () => {
+    const c = await caches.open(
+      (await caches.keys()).find((k) => k.includes('adrio-shell')),
+    )
+    return (await c.keys()).map((r) => new URL(r.url).pathname)
+  })
+  assert.ok(
+    cached.every(
+      (path) =>
+        !path.includes('config.js') &&
+        !path.includes('/auth/') &&
+        !path.includes('/rest/'),
+    ),
+  )
+  await publicContext.close()
   assert.deepEqual(errors, [])
   console.log(
     'Public/offline, responsive layout, sharing, auth lifecycle, drag and history restore passed (mocked service).',
