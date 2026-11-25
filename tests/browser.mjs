@@ -182,14 +182,13 @@ try {
     .locator('#status')
     .filter({ hasText: 'Calendario orientativo inicial' })
     .waitFor()
-  await page.locator('#pesimista').click()
   assert.equal(
-    await page.locator('#pesimista').getAttribute('aria-pressed'),
+    await page.locator('#realista').getAttribute('aria-pressed'),
     'true',
   )
   for (let i = 0; i < 3; i++) {
     await page.locator('#optimista').click()
-    await page.locator('#pesimista').click()
+    await page.locator('#realista').click()
   }
   assert.equal(await page.locator('.bar').count(), 7)
   assert.equal(await page.locator('.handle').count(), 0)
@@ -205,8 +204,18 @@ try {
   await page.locator('#share').click()
   assert.equal(
     await page.evaluate(() => window.shared),
-    url + '?escenario=pesimista',
+    url + '?escenario=realista',
   )
+  for (const [slug, active] of [
+    ['pesimista', 'realista'],
+    ['realista', 'realista'],
+    ['optimista', 'optimista'],
+    ['comparar', 'comparar'],
+  ]) {
+    await page.goto(url + '?escenario=' + slug)
+    await page.waitForSelector('#' + active + '[aria-pressed="true"]')
+  }
+  await page.goto(url)
   offline = false
   await page.reload()
   await page
@@ -253,17 +262,20 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.reload()
   await page.locator('#theme').selectOption('light')
-  await page.locator('#pesimista').click()
+  await page.locator('#realista').click()
   await page.locator('#chart').scrollIntoViewIfNeeded()
-  await shot('pessimistic')
+  await shot('realista')
   await page.locator('#comparar').click()
-  await page.locator('#baseline').check()
   assert.equal(await page.locator('.secondBar').count(), 7)
-  assert.equal(await page.locator('.baseBar').count(), 14)
+  assert.equal(
+    await page
+      .locator('.baseBar,#baseline,.brief,#milestones,#obState')
+      .count(),
+    0,
+  )
   assert.equal(writes, 0)
   await shot('compare')
   await page.locator('#optimista').click()
-  await page.locator('#baseline').uncheck()
   await page.locator('#chart').scrollIntoViewIfNeeded()
   await shot('gantt')
   await page.locator('#chart button.caption').first().click()
@@ -334,7 +346,7 @@ try {
       'Publicación sincronizada',
   )
   assert.equal(writes, 1)
-  assert.ok(published.plans.optimista[0].d > 3)
+  assert.ok(published.plans.pesimista[0].d > 4)
   const touch = await page.context().newCDPSession(page)
   await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true })
   const bounds = await page.locator('.bar').first().boundingBox()
@@ -353,7 +365,7 @@ try {
       'Publicación sincronizada',
   )
   assert.equal(writes, 2)
-  assert.ok(published.plans.optimista[0].s > 0)
+  assert.ok(published.plans.pesimista[0].s > 0)
   await page.locator('#editor summary').focus()
   await page.keyboard.press('Enter')
   const end = page.locator('#manual input').nth(1)
@@ -377,7 +389,6 @@ try {
   await page
     .locator('#entryText')
     .fill('Entrada de ensayo en un servicio simulado.')
-  await page.locator('#obState').selectOption('active')
   await page.locator('#photoFile').setInputFiles({
     name: 'wrong.png',
     mimeType: 'image/png',

@@ -58,22 +58,6 @@ export const day = (d) =>
     dateStyle: 'long',
     timeZone: 'Europe/Madrid',
   })
-export function phaseStatus(state, i, entries, now, mode) {
-  if (state.completed[i]) return 'Completada'
-  const obs = entries.find(
-    (e) => e.phase === state.plans[mode][i].id && e.observation,
-  )
-  if (!obs) return 'Sin confirmar'
-  const age = Date.now() - Date.parse(obs.observed + 'T12:00:00Z')
-  if (age > 90 * 86400000) return 'Sin información reciente'
-  return (
-    {
-      active: 'En ejecución',
-      pending: 'Pendiente',
-      late: 'Retrasada respecto al plan',
-    }[obs.observation] || 'Sin confirmar'
-  )
-}
 export function yearParts(start, duration) {
   const parts = []
   let n = start

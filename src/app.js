@@ -1,6 +1,6 @@
 import {
   defaults,
-  modes,
+  scenarioNames,
   phases,
   edit,
   complete,
@@ -19,14 +19,11 @@ import { diary } from './diary.js'
 import { album, comments } from './album.js'
 import { overview } from './overview.js'
 const $ = (id) => document.getElementById(id)
-let mode =
-  new URL(location.href).searchParams.get('escenario') === 'pesimista'
-    ? 'pesimista'
-    : 'optimista'
+const requestedScenario = new URL(location.href).searchParams.get('escenario')
+let mode = requestedScenario === 'optimista' ? 'optimista' : 'pesimista'
 let visitorPreview = false,
-  compare = new URL(location.href).searchParams.get('escenario') === 'comparar',
+  compare = requestedScenario === 'comparar',
   listView = matchMedia('(max-width:640px)').matches,
-  baseView = false,
   gallery,
   notes,
   book,
@@ -149,7 +146,6 @@ function render() {
   if (store?.editing) return
   const state = (visitorPreview ? store?.published : store?.state) ?? fallback,
     now = today(),
-    plan = state.plans[mode],
     enabled = Boolean(
       !visitorPreview &&
         store?.admin &&
@@ -192,8 +188,8 @@ function render() {
   $('draft').textContent = store?.draft
     ? 'Vista del borrador local pendiente de publicación.'
     : 'Vista de la última publicación.'
-  for (const m of [...modes, 'comparar'])
-    $(m).setAttribute(
+  for (const m of [...Object.keys(scenarioNames), 'comparar'])
+    $(scenarioNames[m] ?? m).setAttribute(
       'aria-pressed',
       String(m === (compare ? 'comparar' : mode)),
     )
@@ -224,13 +220,11 @@ function render() {
       Boolean(store?.stamp),
       book?.rows ?? [],
       compare,
-      baseView,
     )
     renderChart($('chart'), state, mode, now, enabled && !compare, {
       photoDays: gallery?.dates() ?? [],
       openMonth: gallery?.openMonth,
       compare,
-      baseline: baseView,
       detail,
       lock: (v) => {
         store.editing = v
@@ -246,10 +240,10 @@ function render() {
     lastDay = now
   }
 }
-for (const m of [...modes, 'comparar'])
-  $(m).onclick = () => {
+for (const m of [...Object.keys(scenarioNames), 'comparar'])
+  $(scenarioNames[m] ?? m).onclick = () => {
     compare = m === 'comparar'
-    mode = compare ? 'optimista' : m
+    mode = compare ? 'pesimista' : m
     extraVersion++
     render()
   }
@@ -271,11 +265,6 @@ $('gantt').onclick = () => {
 }
 $('vertical').onclick = () => {
   listView = true
-  render()
-}
-$('baseline').onchange = () => {
-  baseView = $('baseline').checked
-  extraVersion++
   render()
 }
 $('goToday').onclick = () => {
@@ -443,7 +432,7 @@ $('discard').onclick = safe(() => {
 })
 function shareURL() {
   const u = new URL(location.pathname, location.origin)
-  u.searchParams.set('escenario', compare ? 'comparar' : mode)
+  u.searchParams.set('escenario', compare ? 'comparar' : scenarioNames[mode])
   return u.href
 }
 $('copy').onclick = safe(async () => {
@@ -451,17 +440,16 @@ $('copy').onclick = safe(async () => {
   $('notice').textContent = 'Enlace copiado.'
 })
 $('share').onclick = safe(async () => {
-  const url = shareURL(),
-    text =
-      'Seguimiento de Obra Adrio III · Escenario ' +
-      (compare ? 'comparado' : mode) +
-      ' · Entrega estimada: ' +
-      format(delivery((store?.published ?? fallback).plans[mode])) +
-      (compare
-        ? ' a ' +
-          format(delivery((store?.published ?? fallback).plans.pesimista))
-        : '') +
-      '. Previsión no oficial.'
+  const url = shareURL()
+  const plans = (store?.published ?? fallback).plans
+  const estimate = compare
+    ? 'Entrega realista: ' +
+      format(delivery(plans.pesimista)) +
+      ' · Entrega optimista: ' +
+      format(delivery(plans.optimista))
+    : 'Entrega ' + scenarioNames[mode] + ': ' + format(delivery(plans[mode]))
+  const text =
+    'Seguimiento de Obra Adrio III · ' + estimate + '. Previsión no oficial.'
   if (navigator.share) {
     try {
       await navigator.share({ text, url })
@@ -499,8 +487,8 @@ function inspect(raw) {
   preview = decode(raw)
   previewBase = store.revision
   $('comparison').replaceChildren()
-  for (const m of modes) {
-    $('comparison').append(element('h3', m))
+  for (const [m, name] of Object.entries(scenarioNames)) {
+    $('comparison').append(element('h3', name))
     preview.plans[m].forEach((p, i) =>
       $('comparison').append(
         element(

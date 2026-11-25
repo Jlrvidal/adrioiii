@@ -575,27 +575,12 @@ nav button {
 .outlook small {
   font-size: 12px;
 }
-.brief {
-  display: flex;
-  gap: var(--gap);
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line);
-}
-.brief > div {
-  flex: 1;
-}
-.brief p {
-  margin: 1px 0;
-  font-weight: 570;
-}
-.brief small,
 .entry small {
   font-size: 12px;
 }
 .sectionTitle,
 .toolbar,
-.chartfoot,
-.upcoming {
+.chartfoot {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -618,8 +603,7 @@ h3 {
   margin: 8px 0;
 }
 .planning,
-.journal,
-.upcoming {
+.journal {
   margin: 30px 0;
 }
 .toolbar {
@@ -629,8 +613,8 @@ h3 {
   justify-content: flex-start;
   border-top: 1px solid var(--line);
 }
-.toolbar label {
-  margin-left: auto;
+.toolbar > div {
+  margin-right: auto;
 }
 .toolbar button {
   border: 0;
@@ -732,15 +716,6 @@ select {
   top: 4px;
   height: 19px;
 }
-.baseBar {
-  position: absolute;
-  border-bottom: 2px dashed var(--ink);
-  bottom: 2px;
-  z-index: 1;
-}
-.baseBar.pesimista {
-  bottom: 0;
-}
 .years span {
   color: white;
   font-weight: 700;
@@ -800,25 +775,6 @@ select {
 }
 .method p {
   max-width: 74ch;
-}
-.upcoming {
-  align-items: flex-start;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 24px;
-}
-#milestones {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-#milestones > div {
-  border-left: 2px solid var(--accent);
-  padding-left: 12px;
-  max-width: 230px;
-}
-#milestones strong {
-  display: block;
-  font-size: 14px;
 }
 .phaseItem {
   display: flex;
@@ -918,7 +874,6 @@ footer {
   border-top: 1px solid var(--line);
 }
 .entry,
-.brief,
 .outlook,
 #phaseBody {
   overflow-wrap: anywhere;
@@ -954,12 +909,8 @@ footer {
   .eyelabel {
     font-size: 9px;
   }
-  .brief {
-    font-size: 13px;
-  }
   .planning,
-  .journal,
-  .upcoming {
+  .journal {
     margin: 23px 0;
   }
   .chartfoot small {
@@ -1035,16 +986,6 @@ footer {
     font: 650 14px system-ui;
     letter-spacing: normal;
   }
-  .brief {
-    padding: 8px 0;
-    gap: 8px;
-  }
-  .brief small {
-    font-size: 10px;
-  }
-  .brief p {
-    font-size: 12px;
-  }
   .toolbar {
     gap: 3px;
     font-size: 12px;
@@ -1058,9 +999,6 @@ footer {
   }
   .sectionTitle {
     gap: 8px;
-  }
-  .toolbar label {
-    margin-left: 2px;
   }
   .phaseItem {
     padding: 10px;
@@ -1076,9 +1014,6 @@ footer {
   }
   .caption small {
     font-size: 10px;
-  }
-  #milestones {
-    gap: 12px;
   }
   .planning .sectionTitle {
     align-items: flex-start;
@@ -1187,14 +1122,6 @@ footer {
     display: block;
     line-height: 1.35;
   }
-  .brief > div {
-    min-width: 0;
-  }
-}
-#milestones details {
-  flex-basis: 100%;
-  font-size: 13px;
-  color: var(--muted);
 }
 .entry .thumbnail {
   background: var(--tint);
@@ -1232,13 +1159,6 @@ footer {
 }
 .todayline b {
   vertical-align: top;
-}
-.dual .baseBar.optimista {
-  bottom: auto;
-  top: 25px;
-}
-.dual .baseBar.pesimista {
-  bottom: 1px;
 }
 #compareKey {
   font-size: 12px;

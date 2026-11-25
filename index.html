@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=album1" />
+    <link rel="stylesheet" href="./style.css?v=realista1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=album1"></script>
-    <script type="module" src="./src/app.js?v=album1"></script>
+    <script defer src="./config.js?v=realista1"></script>
+    <script type="module" src="./src/app.js?v=realista1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -86,37 +86,26 @@
       </section>
       <section class="outlook" aria-label="Previsiones y progreso">
         <article>
-          <span class="eyelabel"><i class="dot teal"></i>Entrega optimista</span
-          ><strong id="early"></strong><small id="earlyDelta"></small>
+          <span class="eyelabel"><i class="dot amber"></i>Entrega realista</span
+          ><strong id="late"></strong><small id="lateDelta"></small>
         </article>
         <article>
-          <span class="eyelabel"
-            ><i class="dot amber"></i>Entrega pesimista</span
-          ><strong id="late"></strong><small id="lateDelta"></small>
+          <span class="eyelabel"><i class="dot teal"></i>Entrega optimista</span
+          ><strong id="early"></strong><small id="earlyDelta"></small>
         </article>
         <article>
           <span class="eyelabel">Hitos confirmados</span
           ><strong id="count"></strong><small id="expected"></small>
         </article>
       </section>
-      <div class="brief">
-        <div>
-          <small>Estado observado</small>
-          <p id="actual"></p>
-        </div>
-        <div>
-          <small>Próximo hito previsto</small>
-          <p id="next"></p>
-        </div>
-      </div>
       <section id="calendario" class="planning">
         <div class="sectionTitle">
           <div>
             <h2>Calendario de obra</h2>
           </div>
           <div class="tabs" aria-label="Escenario">
-            <button id="optimista">Optimista</button
-            ><button id="pesimista">Pesimista</button
+            <button id="realista">Realista</button
+            ><button id="optimista">Optimista</button
             ><button id="comparar">Comparar</button>
           </div>
         </div>
@@ -125,15 +114,14 @@
             <button id="gantt">Gantt</button
             ><button id="vertical">Por fases</button>
           </div>
-          <label><input type="checkbox" id="baseline" /> Plan inicial</label
-          ><button id="goToday">Ir a hoy</button
+          <button id="goToday">Ir a hoy</button
           ><button id="chartAlbum" disabled>Fotos por día</button>
         </div>
         <div class="scroll" tabindex="0" aria-label="Calendario desplazable">
           <div id="chart"></div>
         </div>
         <p id="compareKey" hidden>
-          O · Optimista (arriba) &nbsp; P · Pesimista (abajo)
+          R · Realista (arriba) &nbsp; O · Optimista (abajo)
         </p>
         <div id="phaseList"></div>
         <div class="chartfoot">
@@ -144,18 +132,11 @@
           <p>
             Las dos previsiones parten de duraciones y solapamientos diferentes.
             La línea de hoy indica el paso del tiempo. Solo los hitos
-            confirmados acreditan trabajos terminados. El trazo discontinuo
-            muestra el plan inicial cuando está seleccionado.
+            confirmados acreditan trabajos terminados.
           </p>
         </details>
       </section>
       <div class="journey" id="journey" aria-label="Hitos de la obra"></div>
-      <section class="upcoming">
-        <div>
-          <h2>Próximos hitos</h2>
-        </div>
-        <div id="milestones"></div>
-      </section>
       <section id="diario" class="journal">
         <div class="sectionTitle">
           <div>
@@ -323,13 +304,6 @@
             id="observed"
             required /></label
         ><label>Fase<select id="entryPhase"></select></label
-        ><label
-          >Estado observado<select id="obState">
-            <option value="">Sin indicación</option>
-            <option value="pending">Pendiente</option>
-            <option value="active">En ejecución</option>
-            <option value="late">Retrasada respecto al plan</option>
-          </select></label
         ><label>Título<input id="entryTitle" required maxlength="100" /></label
         ><label
           >Descripción<textarea

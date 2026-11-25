@@ -5,7 +5,6 @@ import {
   format,
   monthISO,
   offsetOf,
-  defaults,
 } from './schedule.js'
 import { icon, descriptions, yearParts, yearColor } from './phases.js'
 export function element(tag, text = '', cls = '') {
@@ -15,14 +14,8 @@ export function element(tag, text = '', cls = '') {
   return el
 }
 export function renderChart(root, state, mode, now, canEdit, actions) {
-  const plan = state.plans[mode],
-    original = defaults().plans
-  const all = [
-    ...state.plans.optimista,
-    ...state.plans.pesimista,
-    ...original.optimista,
-    ...original.pesimista,
-  ]
+  const plan = state.plans[mode]
+  const all = [...state.plans.pesimista, ...state.plans.optimista]
   const photoMonths = [
     ...new Set((actions.photoDays ?? []).map((d) => d.slice(0, 7))),
   ]
@@ -122,7 +115,7 @@ export function renderChart(root, state, mode, now, canEdit, actions) {
       info.textContent =
         format(p.s) + ' – ' + format(p.s + p.d) + ' · ' + status
       label.textContent =
-        (actions.compare ? 'O · ' : '') +
+        (actions.compare ? 'R · ' : '') +
         (state.completed[i] ? '✓ ' : '') +
         p.d +
         ' m'
@@ -144,31 +137,13 @@ export function renderChart(root, state, mode, now, canEdit, actions) {
     row.append(caption, track)
     track.append(bar)
     if (actions.compare) {
-      const p2 = state.plans.pesimista[i],
-        second = element('div', 'P · ' + p2.d + ' m', 'secondBar')
+      const p2 = state.plans.optimista[i],
+        second = element('div', 'O · ' + p2.d + ' m', 'secondBar')
       bar.classList.add('firstBar')
       segments(second, p2)
       second.style.left = pct(p2.s - first)
       second.style.width = pct(p2.d)
       track.append(second)
-    }
-    if (actions.baseline) {
-      for (const scenario of actions.compare
-        ? ['optimista', 'pesimista']
-        : [mode]) {
-        const orig = original[scenario][i],
-          ref = element('span', '', 'baseBar ' + scenario)
-        ref.title =
-          'Inicial · ' +
-          scenario +
-          ' · ' +
-          format(orig.s) +
-          ' – ' +
-          format(orig.s + orig.d)
-        ref.style.left = pct(orig.s - first)
-        ref.style.width = pct(orig.d)
-        track.append(ref)
-      }
     }
     root.append(row)
     bar.classList.toggle('done', state.completed[i])
