@@ -619,7 +619,6 @@ h3 {
 }
 .planning,
 .journal,
-#evolucion,
 .upcoming {
   margin: 30px 0;
 }
@@ -915,26 +914,6 @@ textarea {
 #photoBody figure {
   flex: 1 1 150px;
 }
-#forecasts svg {
-  width: 100%;
-  max-height: 210px;
-  display: block;
-}
-#forecasts polyline {
-  fill: none;
-  stroke-width: 3;
-}
-#forecasts .optimista {
-  stroke: var(--accent);
-}
-#forecasts .pesimista {
-  stroke: var(--year3);
-  stroke-dasharray: 5 3;
-}
-#forecasts text {
-  font: 12px system-ui;
-  fill: var(--muted);
-}
 footer {
   border-top: 1px solid var(--line);
 }
@@ -980,7 +959,6 @@ footer {
   }
   .planning,
   .journal,
-  #evolucion,
   .upcoming {
     margin: 23px 0;
   }
@@ -1266,4 +1244,267 @@ footer {
   font-size: 12px;
   color: var(--muted);
   margin: 6px 0;
+}
+.cover {
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  border-block: 1px solid var(--ink);
+}
+.covertext {
+  align-self: center;
+}
+.cover .kicker {
+  font:
+    italic 1rem Georgia,
+    serif;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+.cover h1 {
+  font-size: clamp(3.2rem, 7vw, 6.5rem);
+  letter-spacing: -0.065em;
+}
+.cover h1 i {
+  color: var(--accent);
+}
+.cover p,
+.coverstatus #stamp {
+  color: var(--muted);
+}
+.cover #status {
+  color: var(--accent);
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.cover figure {
+  border: 0;
+}
+#coverLink {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+.cover figure.withPhoto img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+}
+.cover figure.withPhoto figcaption {
+  display: block;
+  background: #19251ef0;
+  color: white;
+  padding: 4px 9px;
+  pointer-events: none;
+}
+#album {
+  scroll-margin-top: 1rem;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding: 1rem 0;
+  margin: 1rem 0 2rem;
+}
+.albumHead,
+.albumNav,
+#photoUpload {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.albumHead {
+  justify-content: space-between;
+  margin: 1rem 0;
+}
+.albumNav {
+  gap: 0.25rem;
+}
+.albumNav button,
+#addDaily,
+#postComment {
+  min-height: 42px;
+}
+#dailyImages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 1rem;
+}
+#dailyImages figure {
+  margin: 0;
+}
+#dailyImages figure button {
+  background: var(--paper);
+  border: 0;
+  display: block;
+  padding: 0;
+  width: 100%;
+  overflow: hidden;
+}
+#dailyImages img {
+  display: block;
+  width: 100%;
+  height: clamp(170px, 22vw, 300px);
+  object-fit: contain;
+}
+#dailyImages figcaption,
+.siteComment time {
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+#photoUpload {
+  margin-top: 1rem;
+  align-items: flex-end;
+}
+#photoUpload label,
+#commentForm label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+#photoUpload input {
+  width: min(100%, 280px);
+  font-size: 0.85rem;
+}
+#photoQuota {
+  align-self: center;
+}
+#addDaily,
+#postComment {
+  background: var(--accent);
+  color: var(--paper);
+}
+#addDaily:disabled {
+  background: var(--line);
+  color: var(--muted);
+}
+#uploadMessage:empty,
+#commentMessage:empty {
+  display: none;
+}
+#photoBody > img {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+}
+.albumTrack {
+  min-height: 34px;
+}
+.albumMark {
+  position: absolute;
+  top: 1px;
+  min-height: 32px;
+  height: 32px;
+  padding: 0;
+  z-index: 2;
+  color: var(--accent);
+  background: var(--tint);
+  border: 1px solid var(--accent);
+}
+#monthDays {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 0;
+  max-height: 55vh;
+  overflow: auto;
+}
+#commentForm:not([hidden]) {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 40rem;
+  margin: 1rem 0;
+}
+#commentForm button {
+  justify-self: start;
+}
+#commentForm textarea {
+  min-height: 5rem;
+}
+.siteComment {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+  border-bottom: 1px solid var(--line);
+  padding: 0.75rem 0;
+  flex-wrap: wrap;
+}
+.siteComment p {
+  flex: 1;
+  min-width: min(220px, 100%);
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#commentsList {
+  margin: 1rem 0 2rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  #dailyImages img,
+  .withPhoto img {
+    animation: photoIn 0.22s ease-out;
+  }
+  @keyframes photoIn {
+    from {
+      opacity: 0.4;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+@media (max-width: 600px) {
+  .cover {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .covertext {
+    width: 100%;
+    padding: 18px;
+  }
+  .cover figure {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 105px;
+    opacity: 1;
+  }
+  .cover figure.withPhoto {
+    height: 165px;
+  }
+  .cover figure:not(.withPhoto) img {
+    height: 95px;
+  }
+  .cover figure:not(.withPhoto) figcaption {
+    display: none;
+  }
+  #photoUpload label {
+    width: 100%;
+  }
+  #albumDate {
+    max-width: calc(100vw - 135px);
+  }
+}
+
+.albumShortcut {
+  display: inline-block;
+  color: var(--accent);
+  text-underline-offset: 3px;
+  font-size: 0.9rem;
+  padding: 0.3rem 0;
+}
+@media (max-width: 600px) {
+  .coverstatus {
+    width: 100%;
+  }
+  .cover figure:not(.withPhoto) {
+    background: #1b3d34;
+  }
 }

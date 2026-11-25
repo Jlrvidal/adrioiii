@@ -170,7 +170,75 @@ await db.exec('reset role;set role authenticated')
 await db.exec('delete from public.adrio_diary')
 await db.exec('reset role;set role anon')
 assert.equal((await db.query('select * from storage.objects')).rows.length, 0)
+await db.exec('reset role')
+await db.exec(
+  await readFile(
+    new URL('../migrations/003_daily_photos.sql', import.meta.url),
+    'utf8',
+  ),
+)
+assert.equal(
+  (
+    await db.query(
+      "select relrowsecurity from pg_class where oid='adrio_private.daily_photos'::regclass",
+    )
+  ).rows[0].relrowsecurity,
+  true,
+)
+const jpeg = await readFile(new URL('fixtures/album.jpg', import.meta.url))
+const add = (id, bytes = jpeg) =>
+  db.query('select public.adrio_add_photo($1,$2) as path', [
+    id,
+    bytes.toString('base64'),
+  ])
+await db.exec('set role anon')
+await assert.rejects(add(crypto.randomUUID(), Buffer.from('invalid')), /válida/)
+const id = crypto.randomUUID()
+const path = (await add(id)).rows[0].path
+assert.equal((await add(id)).rows[0].path, path)
+await add(crypto.randomUUID())
+await db.exec('reset role;set role authenticated')
+await add(crypto.randomUUID())
+await assert.rejects(add(crypto.randomUUID()), /tres fotos/)
+assert.equal(
+  (await db.query('select * from public.adrio_photo_index()')).rows.length,
+  3,
+)
+assert.deepEqual(
+  Buffer.from(
+    (
+      await db.query('select public.adrio_photo($1,1::smallint) as b', [
+        path.slice(0, 10),
+      ])
+    ).rows[0].b,
+    'base64',
+  ),
+  jpeg,
+)
+await assert.rejects(object(), { code: '42501' })
+const comment = () =>
+  db.exec("insert into public.adrio_comments(body) values ('Avance')")
+await db.exec(
+  "set request.jwt.claim.sub='00000000-0000-4000-a000-000000000001'",
+)
+await assert.rejects(comment(), { code: '42501' })
+await db.exec(`set request.jwt.claim.sub='${owner}'`)
+await comment()
+await db.exec(
+  "set request.jwt.claim.sub='00000000-0000-4000-a000-000000000001';delete from public.adrio_comments",
+)
+assert.equal(
+  (await db.query('select * from public.adrio_comments')).rows.length,
+  1,
+)
+await db.exec(
+  `set request.jwt.claim.sub='${owner}';delete from public.adrio_comments`,
+)
+assert.equal(
+  (await db.query('select * from public.adrio_comments')).rows.length,
+  0,
+)
 await db.close()
 console.log(
-  'Both migrations, legacy history, admin locks, diary publication, storage RLS and public forecast projection passed.',
+  'Three migrations passed, including the shared photo limit, retries and comment permissions.',
 )

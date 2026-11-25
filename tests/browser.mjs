@@ -61,6 +61,9 @@ try {
   let published = legacy,
     diaryRows = [],
     photoPath = '',
+    photoBytes = '',
+    comments = [],
+    dailyPhotos = [],
     diaryWrites = 0
   await page.route('https://*.supabase.co/**', async (route) => {
     const req = route.request(),
@@ -112,6 +115,26 @@ try {
     }
     if (path === '/rest/v1/rpc/adrio_history')
       return send([{ revision: 0, state: legacy, updated_at: stamp }])
+    if (path === '/rest/v1/rpc/adrio_photo_index') return send(dailyPhotos)
+    if (path === '/rest/v1/rpc/adrio_photo') return send(photoBytes)
+    if (path === '/rest/v1/rpc/adrio_add_photo') {
+      if (dailyPhotos.length >= 3)
+        return send({ message: 'Ya hay tres fotos para este día' }, 400)
+      const taken = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Madrid',
+      }).format(new Date())
+      photoBytes = req.postDataJSON().image_base64
+      const slot = dailyPhotos.length + 1
+      dailyPhotos.push({ taken, slot, legacy: null })
+      photoPath = taken + '/' + slot + '.jpg'
+      return send(photoPath)
+    }
+    if (path === '/rest/v1/adrio_comments') {
+      if (req.method() === 'GET') return send(comments)
+      if (req.method() === 'DELETE') return send(comments.pop())
+      comments.push({ ...req.postDataJSON(), id: owner })
+      return send(null, 201)
+    }
     if (path === '/rest/v1/adrio_diary') {
       if (req.method() === 'GET') return send(diaryRows)
       if (uid !== owner) return send({}, 403)
@@ -247,6 +270,18 @@ try {
   await page.locator('#phaseDialog[open]').waitFor()
   await page.locator('#phaseDialog button').click()
   await page.locator('#diario').scrollIntoViewIfNeeded()
+  await page.locator('#sharePhoto').setInputFiles({
+    name: 'obra.png',
+    mimeType: 'image/png',
+    buffer: await readFile(new URL('../assets/icon-192.png', import.meta.url)),
+  })
+  await page.locator('#addDaily').click()
+  await page.locator('#dailyImages img').waitFor()
+  await page.locator('.albumMark').first().click()
+  await page.locator('#dailyImages button').first().click()
+  await page.locator('#photoDialog[open] img').waitFor()
+  await page.locator('#photoDialog button').click()
+  assert.ok(!(await page.locator('#commentForm').isVisible()))
   await shot('diary')
   offline = true
   await page.reload()
@@ -331,30 +366,30 @@ try {
       'Publicación sincronizada',
   )
   assert.equal(writes, 3)
+  await page.locator('#commentText').fill('Comentario de prueba')
+  await page.locator('#postComment').click()
+  await page.locator('.siteComment').waitFor()
+  page.once('dialog', (d) => d.accept())
+  await page.locator('.siteComment button').click()
+  await page.locator('.siteComment').waitFor({ state: 'detached' })
   await page.locator('#newEntry').click()
   await page.locator('#entryTitle').fill('Observación de prueba')
   await page
     .locator('#entryText')
     .fill('Entrada de ensayo en un servicio simulado.')
   await page.locator('#obState').selectOption('active')
-  await page
-    .locator('#photoFile')
-    .setInputFiles({
-      name: 'wrong.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('invalid'),
-    })
+  await page.locator('#photoFile').setInputFiles({
+    name: 'wrong.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('invalid'),
+  })
   await page.locator('#previewEntry').click()
   await page.locator('#entryError').filter({ hasText: 'formato' }).waitFor()
-  await page
-    .locator('#photoFile')
-    .setInputFiles({
-      name: 'example.png',
-      mimeType: 'image/png',
-      buffer: await readFile(
-        new URL('../assets/icon-192.png', import.meta.url),
-      ),
-    })
+  await page.locator('#photoFile').setInputFiles({
+    name: 'example.png',
+    mimeType: 'image/png',
+    buffer: await readFile(new URL('../assets/icon-192.png', import.meta.url)),
+  })
   await page.locator('#previewEntry').click()
   await page.locator('#publishEntry').waitFor()
   assert.equal(diaryWrites, 0)
@@ -364,7 +399,7 @@ try {
     .filter({ hasText: 'Observación de prueba' })
     .waitFor()
   assert.equal(diaryWrites, 1)
-  assert.ok(photoPath.endsWith('.webp'))
+  assert.ok(photoPath.endsWith('.jpg'))
   await page.reload()
   await page.locator('.entry h3').waitFor()
   await page
@@ -390,6 +425,25 @@ try {
     .click()
   await page.locator('.entry').waitFor({ state: 'detached' })
   assert.equal(diaryWrites, 3)
+  await page.locator('#sharePhoto').setInputFiles({
+    name: 'tercera.jpg',
+    mimeType: 'image/jpeg',
+    buffer: await readFile(new URL('fixtures/album.jpg', import.meta.url)),
+  })
+  await page.locator('#addDaily').click()
+  await page.locator('#photoQuota').filter({ hasText: 'completo' }).waitFor()
+  assert.equal(await page.locator('#dailyImages figure').count(), 3)
+  assert.equal(await page.locator('#addDaily').isDisabled(), true)
+  const prior = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  dailyPhotos.push({ taken: prior, slot: 1, legacy: null })
+  await page.reload()
+  await page.locator('#chartAlbum').click()
+  await page.locator('#monthDays button').last().click()
+  assert.equal(await page.locator('#albumDate').inputValue(), prior)
+  await page.locator('#newerDay').click()
+  assert.equal(await page.locator('#dailyImages figure').count(), 3)
+  await page.locator('#album').scrollIntoViewIfNeeded()
+  await shot('album-days')
   await page.locator('#history').click()
   await page.locator('#list button').first().click()
   await page.locator('#apply').click()

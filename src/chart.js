@@ -4,6 +4,7 @@ import {
   delivery,
   format,
   monthISO,
+  offsetOf,
   defaults,
 } from './schedule.js'
 import { icon, descriptions, yearParts, yearColor } from './phases.js'
@@ -22,7 +23,12 @@ export function renderChart(root, state, mode, now, canEdit, actions) {
     ...original.optimista,
     ...original.pesimista,
   ]
-  const first = Math.floor(Math.min(-1, now, ...all.map((p) => p.s))),
+  const photoMonths = [
+    ...new Set((actions.photoDays ?? []).map((d) => d.slice(0, 7))),
+  ]
+  const first = Math.floor(
+      Math.min(-1, now, ...photoMonths.map(offsetOf), ...all.map((p) => p.s)),
+    ),
     last = Math.ceil(Math.max(now, delivery(all)) + 2)
   const span = last - first,
     pct = (n) => (100 * n) / span + '%'
@@ -67,6 +73,22 @@ export function renderChart(root, state, mode, now, canEdit, actions) {
       m.classList.add('qStart')
     }
     months.append(m)
+  }
+  if (photoMonths.length) {
+    const row = element('div', '', 'row')
+    const track = element('div', '', 'track albumTrack')
+    row.append(element('div', 'Fotos de obra', 'caption'), track)
+    for (const month of photoMonths) {
+      const monthNumber = offsetOf(month)
+      const button = element('button', '▣', 'albumMark')
+      button.title = 'Ver fotos de ' + format(monthNumber)
+      button.setAttribute('aria-label', button.title)
+      button.style.left = pct(monthNumber - first)
+      button.style.width = pct(1)
+      button.onclick = () => actions.openMonth(month)
+      track.append(button)
+    }
+    root.append(row)
   }
   const marker = element('div', '', 'todayline')
   marker.style.left = pct(now - first)

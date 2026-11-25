@@ -16,7 +16,8 @@ import { connect } from './backend.js'
 import { ScheduleStore } from './sync.js'
 import { renderChart, element } from './chart.js'
 import { diary } from './diary.js'
-import { overview, forecasts } from './overview.js'
+import { album, comments } from './album.js'
+import { overview } from './overview.js'
 const $ = (id) => document.getElementById(id)
 let mode =
   new URL(location.href).searchParams.get('escenario') === 'pesimista'
@@ -26,7 +27,8 @@ let visitorPreview = false,
   compare = new URL(location.href).searchParams.get('escenario') === 'comparar',
   listView = matchMedia('(max-width:640px)').matches,
   baseView = false,
-  publicationSeries = [],
+  gallery,
+  notes,
   book,
   extraVersion = 0,
   extraLoading = false,
@@ -167,7 +169,7 @@ function render() {
     (api?.normalized ? 'Se normalizó la ruta de la API. ' : '') +
       (store?.message || 'Sin conexión')
   book?.setAdmin(Boolean(store?.admin && !visitorPreview))
-  $('forecastNote').hidden = !store?.admin || publicationSeries.length === 0
+  notes?.setAdmin(Boolean(store?.admin && !visitorPreview))
   $('stamp').textContent = store?.stamp
     ? 'Actualizado el ' +
       new Date(store.stamp).toLocaleDateString('es-ES', {
@@ -221,11 +223,12 @@ function render() {
       now,
       Boolean(store?.stamp),
       book?.rows ?? [],
-      publicationSeries,
       compare,
       baseView,
     )
     renderChart($('chart'), state, mode, now, enabled && !compare, {
+      photoDays: gallery?.dates() ?? [],
+      openMonth: gallery?.openMonth,
       compare,
       baseline: baseView,
       detail,
@@ -308,62 +311,22 @@ try {
     if (cachedStore.stamp) store = cachedStore
   }
 }
-book = diary(api, () => {
+function extrasChanged() {
   extraVersion++
   render()
-})
+}
+book = diary(api, extrasChanged)
+gallery = album(api?.db, extrasChanged)
+notes = comments(api?.db)
 async function extras() {
   if (extraLoading || document.hidden || store?.editing || viewingEdit()) return
   extraLoading = true
   try {
-    await Promise.all([
-      book.refresh(),
-      (async () => {
-        if (!api) {
-          forecasts([], true)
-          return
-        }
-        const data = []
-        let error
-        for (let from = 0; ; from += 200) {
-          const page = await api.db
-            .rpc('adrio_forecasts')
-            .order('revision')
-            .range(from, from + 199)
-          if (page.error || !Array.isArray(page.data)) {
-            error = true
-            break
-          }
-          data.push(...page.data)
-          if (page.data.length < 200) break
-        }
-        if (!error && Array.isArray(data))
-          publicationSeries = data.filter(
-            (r) =>
-              Number.isInteger(r.optimista) &&
-              Number.isInteger(r.pesimista) &&
-              Number.isFinite(Date.parse(r.published_at)),
-          )
-        forecasts(publicationSeries, Boolean(error))
-        extraVersion++
-        render()
-      })(),
-    ])
+    await Promise.all([book.refresh(), gallery.refresh(), notes.refresh()])
   } finally {
     extraLoading = false
   }
 }
-$('forecastNote').onsubmit = safe(async (e) => {
-  e.preventDefault()
-  const { error } = await api.db
-    .from('adrio_forecast_notes')
-    .upsert({ revision: store.revision, reason: $('reason').value.trim() })
-  if (error)
-    throw Error(
-      'No se pudo guardar la explicación. Comprueba la revisión publicada.',
-    )
-  await extras()
-})
 function viewingEdit() {
   return Boolean(
     document.querySelector('dialog[open]') ||
