@@ -12,6 +12,7 @@ create table adrio_private.daily_photos (
   primary key(taken,slot),
   check ((jpeg is null) <> (legacy is null))
 );
+alter table adrio_private.daily_photos enable row level security;
 revoke all on adrio_private.daily_photos from public, anon, authenticated;
 
 -- Keep the three first existing published pictures for each day in the album.

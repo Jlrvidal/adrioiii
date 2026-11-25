@@ -177,6 +177,14 @@ await db.exec(
     'utf8',
   ),
 )
+assert.equal(
+  (
+    await db.query(
+      "select relrowsecurity from pg_class where oid='adrio_private.daily_photos'::regclass",
+    )
+  ).rows[0].relrowsecurity,
+  true,
+)
 const jpeg = await readFile(new URL('fixtures/album.jpg', import.meta.url))
 const add = (id, bytes = jpeg) =>
   db.query('select public.adrio_add_photo($1,$2) as path', [
