@@ -8,6 +8,8 @@ export const madridDay = () =>
     new Date(),
   )
 const key = (row) => row.taken + '/' + row.slot + '.jpg'
+const cacheKey = (row) =>
+  key(row) + ':' + (row.photo_version ?? row.legacy ?? '')
 export async function pages(query) {
   const items = []
   for (let start = 0; ; start += 100) {
@@ -22,13 +24,14 @@ export function album(db, changed) {
     selected = '',
     available = false,
     version = 0,
-    busy = false
+    busy = false,
+    admin = false
   let retry,
     coverKey = '',
     shown = ''
   const sources = new Map()
   async function source(row) {
-    const id = key(row)
+    const id = cacheKey(row)
     if (!sources.has(id)) {
       const pending = row.legacy
         ? db.storage
@@ -43,7 +46,7 @@ export function album(db, changed) {
                 reader.readAsDataURL(new Blob([data], { type: 'image/webp' }))
               })
             })
-        : photoSource(db, id)
+        : photoSource(db, key(row))
       sources.set(id, pending)
       if (sources.size > 12) sources.delete(sources.keys().next().value)
       pending.catch(() => sources.delete(id))
@@ -80,6 +83,27 @@ export function album(db, changed) {
       }
       button.append(img)
       figure.append(button, el('figcaption', 'Foto ' + row.slot))
+      if (admin) {
+        const remove = el('button', 'Eliminar', 'removePhoto')
+        remove.onclick = async () => {
+          if (!admin || !confirm('¿Eliminar esta foto del álbum?')) return
+          remove.disabled = true
+          const { error } = await db.rpc('adrio_remove_photo', {
+            taken_on: row.taken,
+            position_in_day: row.slot,
+          })
+          $('uploadMessage').textContent = error
+            ? error.message
+            : 'Foto eliminada.'
+          if (error) remove.disabled = false
+          else {
+            sources.delete(cacheKey(row))
+            await refresh()
+            window.dispatchEvent(new Event('adrio-photo-removed'))
+          }
+        }
+        figure.append(remove)
+      }
       frame.append(figure)
       source(row).then(
         (src) => {
@@ -106,7 +130,7 @@ export function album(db, changed) {
     $('sharePhoto').disabled = busy || !available || count >= 3
     $('addDaily').disabled = $('sharePhoto').disabled
     $('chartAlbum').disabled = !days.length
-    const signature = JSON.stringify([rows, available])
+    const signature = JSON.stringify([rows, available, admin])
     if (shown === signature) return
     shown = signature
     $('albumDate').replaceChildren()
@@ -115,7 +139,15 @@ export function album(db, changed) {
     if (!days.length) $('albumDate').add(new Option('Sin fotos', ''))
     choose(days.includes(selected) ? selected : days[0] || '')
     const latest = rows.filter((r) => r.taken === days[0]).at(-1)
-    const id = latest && key(latest)
+    const id = latest && cacheKey(latest)
+    if (coverKey !== id && (coverKey || id)) {
+      $('coverFig').classList.remove('withPhoto')
+      $('coverPhoto').src = './assets/section.svg'
+      $('coverPhoto').alt = 'Sección esquemática del edificio'
+      $('coverCaption').textContent = 'Sección orientativa · sin escala'
+      $('coverLink').removeAttribute('href')
+      $('coverLink').onclick = null
+    }
     if (id && coverKey !== id) {
       coverKey = id
       source(latest).then(
@@ -129,19 +161,13 @@ export function album(db, changed) {
           $('coverLink').onclick = () => choose(latest.taken)
         },
         () => {
-          coverKey = ''
-          shown = ''
+          if (coverKey === id) {
+            coverKey = ''
+            shown = ''
+          }
         },
       )
-    } else if (!id && coverKey) {
-      coverKey = ''
-      $('coverFig').classList.remove('withPhoto')
-      $('coverPhoto').src = './assets/section.svg'
-      $('coverPhoto').alt = 'Sección esquemática del edificio'
-      $('coverCaption').textContent = 'Sección orientativa · sin escala'
-      $('coverLink').removeAttribute('href')
-      $('coverLink').onclick = null
-    }
+    } else if (!id) coverKey = ''
     changed()
   }
   async function refresh() {
@@ -199,13 +225,15 @@ export function album(db, changed) {
       retry ??= { id: crypto.randomUUID() }
       $('uploadMessage').textContent = 'Preparando la foto…'
       retry.blob ??= await optimize(file)
-      $('uploadMessage').textContent = 'Publicando…'
+      $('uploadMessage').textContent = 'Enviando…'
       const path = await addPhoto(db, retry.blob, retry.id)
-      selected = path.slice(0, 10)
+      if (path !== 'pendiente') selected = path.slice(0, 10)
       retry = null
       $('photoUpload').reset()
       $('uploadMessage').textContent =
-        'Foto publicada en el álbum del ' + day(selected) + '.'
+        path === 'pendiente'
+          ? 'Foto enviada. Se publicará cuando la revise el administrador.'
+          : 'Foto publicada en el álbum del ' + day(selected) + '.'
     } catch (err) {
       $('uploadMessage').textContent = err.message
     } finally {
@@ -214,7 +242,16 @@ export function album(db, changed) {
     }
   }
   window.addEventListener('adrio-photos-changed', refresh)
-  return { refresh, openMonth, dates }
+  return {
+    refresh,
+    openMonth,
+    dates,
+    setAdmin(value) {
+      if (admin === value) return
+      admin = value
+      draw()
+    },
+  }
 }
 
 export function comments(db) {
@@ -276,12 +313,10 @@ export function comments(db) {
     busy = true
     $('postComment').disabled = true
     try {
-      const { error } = await db
-        .from('adrio_comments')
-        .insert({
-          posted_on: $('commentDate').value,
-          body: $('commentText').value.trim(),
-        })
+      const { error } = await db.from('adrio_comments').insert({
+        posted_on: $('commentDate').value,
+        body: $('commentText').value.trim(),
+      })
       if (error) throw error
       $('commentText').value = ''
       $('commentMessage').textContent = 'Comentario publicado.'

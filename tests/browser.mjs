@@ -64,6 +64,8 @@ try {
     photoBytes = '',
     comments = [],
     dailyPhotos = [],
+    pendingPhotos = [],
+    signedIn = false,
     diaryWrites = 0
   await page.route('https://*.supabase.co/**', async (route) => {
     const req = route.request(),
@@ -82,6 +84,7 @@ try {
           },
           400,
         )
+      signedIn = true
       const user = {
         id: uid,
         aud: 'authenticated',
@@ -106,7 +109,10 @@ try {
         user,
       })
     }
-    if (path === '/auth/v1/logout') return send({})
+    if (path === '/auth/v1/logout') {
+      signedIn = false
+      return send({})
+    }
     if (path === '/rest/v1/rpc/adrio_is_admin') return send(uid === owner)
     if (path === '/rest/v1/rpc/adrio_publish') {
       writes++
@@ -117,17 +123,66 @@ try {
       return send([{ revision: 0, state: legacy, updated_at: stamp }])
     if (path === '/rest/v1/rpc/adrio_photo_index') return send(dailyPhotos)
     if (path === '/rest/v1/rpc/adrio_photo') return send(photoBytes)
-    if (path === '/rest/v1/rpc/adrio_add_photo') {
-      if (dailyPhotos.length >= 3)
+    const publishPhoto = (taken, bytes) => {
+      const slot = [1, 2, 3].find(
+        (n) => !dailyPhotos.some((r) => r.taken === taken && r.slot === n),
+      )
+      if (!slot)
         return send({ message: 'Ya hay tres fotos para este día' }, 400)
+      photoBytes = bytes
+      dailyPhotos.push({
+        taken,
+        slot,
+        legacy: null,
+        photo_version: crypto.randomUUID(),
+      })
+      photoPath = taken + '/' + slot + '.jpg'
+      return send(photoPath)
+    }
+    if (path === '/rest/v1/rpc/adrio_add_photo') {
       const taken = new Intl.DateTimeFormat('sv-SE', {
         timeZone: 'Europe/Madrid',
       }).format(new Date())
-      photoBytes = req.postDataJSON().image_base64
-      const slot = dailyPhotos.length + 1
-      dailyPhotos.push({ taken, slot, legacy: null })
-      photoPath = taken + '/' + slot + '.jpg'
-      return send(photoPath)
+      const bytes = req.postDataJSON().image_base64
+      if (signedIn && uid === owner) return publishPhoto(taken, bytes)
+      pendingPhotos.push({
+        id: crypto.randomUUID(),
+        submitted_on: taken,
+        created_at: stamp,
+        bytes,
+      })
+      return send('pendiente')
+    }
+    if (path === '/rest/v1/rpc/adrio_pending_photos')
+      return send(
+        pendingPhotos.map(({ id, submitted_on, created_at }) => ({
+          id,
+          submitted_on,
+          created_at,
+        })),
+      )
+    if (path === '/rest/v1/rpc/adrio_pending_photo')
+      return send(
+        pendingPhotos.find((row) => row.id === req.postDataJSON().id).bytes,
+      )
+    if (
+      path === '/rest/v1/rpc/adrio_approve_photo' ||
+      path === '/rest/v1/rpc/adrio_reject_photo'
+    ) {
+      const i = pendingPhotos.findIndex(
+        (row) => row.id === req.postDataJSON().id,
+      )
+      const [row] = pendingPhotos.splice(i, 1)
+      return path.endsWith('approve_photo')
+        ? publishPhoto(row.submitted_on, row.bytes)
+        : send(null)
+    }
+    if (path === '/rest/v1/rpc/adrio_remove_photo') {
+      const { taken_on, position_in_day } = req.postDataJSON()
+      dailyPhotos = dailyPhotos.filter(
+        (row) => row.taken !== taken_on || row.slot !== position_in_day,
+      )
+      return send(null)
     }
     if (path === '/rest/v1/adrio_comments') {
       if (req.method() === 'GET') return send(comments)
@@ -282,17 +337,24 @@ try {
   await page.locator('#phaseDialog[open]').waitFor()
   await page.locator('#phaseDialog button').click()
   await page.locator('#diario').scrollIntoViewIfNeeded()
-  await page.locator('#sharePhoto').setInputFiles({
-    name: 'obra.png',
-    mimeType: 'image/png',
-    buffer: await readFile(new URL('../assets/icon-192.png', import.meta.url)),
-  })
-  await page.locator('#addDaily').click()
-  await page.locator('#dailyImages img').waitFor()
-  await page.locator('.albumMark').first().click()
-  await page.locator('#dailyImages button').first().click()
-  await page.locator('#photoDialog[open] img').waitFor()
-  await page.locator('#photoDialog button').click()
+  for (let i = 0; i < 2; i++) {
+    await page.locator('#sharePhoto').setInputFiles({
+      name: 'obra.png',
+      mimeType: 'image/png',
+      buffer: await readFile(
+        new URL('../assets/icon-192.png', import.meta.url),
+      ),
+    })
+    await page.locator('#addDaily').click()
+    await page
+      .getByText(
+        'Foto enviada. Se publicará cuando la revise el administrador.',
+      )
+      .waitFor()
+  }
+  assert.equal(await page.locator('#dailyImages img').count(), 0)
+  assert.match(await page.locator('#photoQuota').textContent(), /0 de 3/)
+  assert.equal(await page.locator('#photoModeration').isVisible(), false)
   assert.ok(!(await page.locator('#commentForm').isVisible()))
   await shot('diary')
   offline = true
@@ -333,6 +395,23 @@ try {
   await page.reload()
   await page.locator('.handle').first().waitFor()
   await page.locator('#admin').scrollIntoViewIfNeeded()
+  await page.locator('#pendingPhotos img[src^="data:"]').first().waitFor()
+  assert.equal(await page.locator('#pendingPhotos article').count(), 2)
+  await page
+    .locator('#pendingPhotos')
+    .getByRole('button', { name: 'Aprobar' })
+    .first()
+    .click()
+  await page.locator('#dailyImages img[src^="data:"]').waitFor()
+  await page
+    .locator('#pendingPhotos')
+    .getByRole('button', { name: 'Rechazar' })
+    .click()
+  await page.getByText('No hay fotos pendientes.').waitFor()
+  await page.locator('.albumMark').first().click()
+  await page.locator('#dailyImages figure button').first().click()
+  await page.locator('#photoDialog[open] img').waitFor()
+  await page.locator('#photoDialog button').click()
   await shot('admin')
   await page.locator('#chart').scrollIntoViewIfNeeded()
   const handle = await page.locator('.bar .handle').nth(1).boundingBox()
@@ -445,6 +524,19 @@ try {
   await page.locator('#photoQuota').filter({ hasText: 'completo' }).waitFor()
   assert.equal(await page.locator('#dailyImages figure').count(), 3)
   assert.equal(await page.locator('#addDaily').isDisabled(), true)
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.locator('#dailyImages .removePhoto').last().click()
+  await page.getByText('Foto eliminada.').waitFor()
+  await page.waitForFunction(
+    () => document.querySelectorAll('#dailyImages figure').length === 2,
+  )
+  await page.locator('#sharePhoto').setInputFiles({
+    name: 'reemplazo.jpg',
+    mimeType: 'image/jpeg',
+    buffer: await readFile(new URL('fixtures/album.jpg', import.meta.url)),
+  })
+  await page.locator('#addDaily').click()
+  await page.locator('#photoQuota').filter({ hasText: 'completo' }).waitFor()
   const prior = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   dailyPhotos.push({ taken: prior, slot: 1, legacy: null })
   await page.reload()
@@ -511,6 +603,14 @@ try {
         !path.includes('/rest/'),
     ),
   )
+  const embed = await browser.newPage()
+  await embed.route('https://*.supabase.co/**', (route) => route.abort())
+  await embed.setContent('<iframe src="' + url + '"></iframe>')
+  const framed = embed.frameLocator('iframe')
+  await framed.locator('html[hidden]').waitFor({ state: 'attached' })
+  assert.equal(await framed.locator('main').isVisible(), false)
+  assert.equal(await framed.locator('#status').textContent(), '')
+  await embed.close()
   await publicContext.close()
   assert.deepEqual(errors, [])
   console.log(
