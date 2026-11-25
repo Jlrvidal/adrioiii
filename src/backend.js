@@ -9,7 +9,7 @@ export function settings(config) {
   if (
     url.protocol !== 'https:' ||
     !/^[a-z0-9-]+\.supabase\.co$/.test(url.hostname) ||
-    url.pathname !== '/' ||
+    !/^\/(?:rest\/v1\/?|auth\/v1\/?)?$/.test(url.pathname) ||
     url.search ||
     url.hash ||
     url.username ||
@@ -30,9 +30,7 @@ export function settings(config) {
         ).role === 'anon'
     } catch {}
   if (!publicKey) throw Error('Configura una clave pública de Supabase.')
-  if (!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(config.owner))
-    throw Error('UUID del administrador no válido.')
-  return { ...config, url: url.origin }
+  return { ...config, url: url.origin, normalized: url.pathname !== '/' }
 }
 async function result(request) {
   const { data, error } = await request
@@ -51,7 +49,9 @@ export function connect(config, sdk) {
   })
   return {
     auth: db.auth,
-    owner: c.owner,
+    normalized: c.normalized,
+    db,
+    owner: null,
     scope: c.url,
     async load() {
       const row = await result(

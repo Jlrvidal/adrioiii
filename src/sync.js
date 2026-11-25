@@ -14,6 +14,8 @@ export class ScheduleStore {
       storage,
       notify,
       published: defaults(),
+      source: 'initial',
+      loadFailed: false,
       revision: null,
       stamp: null,
       admin: false,
@@ -26,6 +28,27 @@ export class ScheduleStore {
       read: 0,
       message: 'Conectando…',
     })
+  }
+  loadCache() {
+    try {
+      const cached = JSON.parse(
+        this.storage.getItem('adrio:public:' + this.api.scope),
+      )
+      if (cached && Number.isFinite(Date.parse(cached.updated_at))) {
+        this.published = validate(cached.state)
+        this.stamp = cached.updated_at
+        this.source = 'cached'
+        this.message = 'Mostrando la última información disponible.'
+      }
+    } catch {}
+  }
+  cachePublication() {
+    try {
+      this.storage.setItem(
+        'adrio:public:' + this.api.scope,
+        JSON.stringify({ state: this.published, updated_at: this.stamp }),
+      )
+    } catch {}
   }
   get state() {
     return this.draft?.state ?? this.published
@@ -83,7 +106,10 @@ export class ScheduleStore {
       if (this.revision !== row.revision || !equal(this.published, row.state))
         this.published = row.state
       this.revision = row.revision
+      this.source = 'remote'
+      this.loadFailed = false
       this.stamp = row.updated_at
+      this.cachePublication()
       if (this.draft && this.draft.base !== row.revision) {
         if (equal(this.draft.state, row.state)) {
           this.draft = null
@@ -102,14 +128,15 @@ export class ScheduleStore {
       )
       if (this.draft) await this.flush()
     } catch (e) {
-      if (read === this.read && epoch === this.epoch)
+      if (read === this.read && epoch === this.epoch) {
+        this.source = this.stamp ? 'cached' : 'initial'
+        this.loadFailed = true
         this.inform(
-          (this.stamp
-            ? 'Sin conexión · última publicación en memoria'
-            : 'Sin conexión · calendario inicial') +
-            ' · ' +
-            e.message,
+          this.stamp
+            ? 'Mostrando la última información disponible.'
+            : 'Calendario orientativo inicial, pendiente de publicación.',
         )
+      }
     }
   }
   persist() {
@@ -173,7 +200,10 @@ export class ScheduleStore {
         throw Error('Confirmación no válida.')
       this.published = snapshot.state
       this.revision = ack.revision
+      this.source = 'remote'
+      this.loadFailed = false
       this.stamp = ack.updated_at
+      this.cachePublication()
       if (snapshot === this.draft) {
         this.draft = null
         this.storage.removeItem(this.key)

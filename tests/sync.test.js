@@ -42,7 +42,7 @@ test('Failed writes recover on reload; competing revisions preserve draft; visit
   assert.equal(calls, 1)
   b.authorize(false)
   assert.deepEqual(b.state, row.state)
-  assert.equal(cache.size, 1)
+  assert.ok(cache.has(b.key))
 })
 test('Queued changes serialize and stale reads cannot replace a draft', async () => {
   const cache = new Map(),
@@ -95,5 +95,39 @@ test('Queued changes serialize and stale reads cannot replace a draft', async ()
   await new Promise(setImmediate)
   assert.equal(row.revision, 2)
   assert.equal(a.draft, null)
-  assert.equal(cache.size, 0)
+  assert.ok(!cache.has(a.key))
+})
+
+test('Only the validated published schedule recovers as a public cache', async () => {
+  const cache = new Map(),
+    storage = {
+      getItem: (k) => cache.get(k),
+      setItem: (k, v) => cache.set(k, v),
+    }
+  const api = {
+    scope: 'test',
+    owner: 'owner',
+    load: async () => ({
+      state: defaults(),
+      revision: 0,
+      updated_at: new Date().toISOString(),
+    }),
+  }
+  const a = new ScheduleStore(api, storage, () => {})
+  await a.refresh()
+  const b = new ScheduleStore(
+    {
+      ...api,
+      load: async () => {
+        throw Error('internal')
+      },
+    },
+    storage,
+    () => {},
+  )
+  b.loadCache()
+  await b.refresh()
+  assert.equal(b.message, 'Mostrando la última información disponible.')
+  assert.deepEqual(b.state, defaults())
+  assert.equal(b.revision, null)
 })

@@ -5,19 +5,44 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; connect-src https://twckvmhkdntuqpsiobnm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; connect-src https://twckvmhkdntuqpsiobnm.supabase.co; img-src 'self' data: blob:; base-uri 'none'; form-action 'none'; object-src 'none'; manifest-src 'self'; worker-src 'self'"
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./style.css?v=portal3" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js"></script>
-    <script type="module" src="./src/app.js"></script>
+    <script defer src="./config.js?v=portal3"></script>
+    <script type="module" src="./src/app.js?v=portal3"></script>
+    <meta
+      name="description"
+      content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
+    />
+    <meta property="og:title" content="Adrio III · Cuaderno de obra" />
+    <meta
+      property="og:description"
+      content="El calendario, los hitos y el diario de la obra en un solo lugar. Seguimiento independiente."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:image"
+      content="https://jlrvidal.github.io/adrioiii/assets/compartir.png"
+    />
+    <meta name="theme-color" content="#193f35" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta
+      name="adrio-cache-origin"
+      content="https://twckvmhkdntuqpsiobnm.supabase.co"
+    />
   </head>
   <body>
     <header>
       <div class="wrap top">
-        <strong>Adrio III</strong>
+        <a class="brand" href="#portada">Adrio <em>III</em></a>
+        <div class="navlinks">
+          <a href="#calendario">Calendario</a
+          ><a href="#diario">Diario de obra</a
+          ><a href="#evolucion">Evolución</a>
+        </div>
         <nav>
           <label
             >Tema
@@ -26,64 +51,141 @@
               <option value="light">Claro</option>
               <option value="dark">Oscuro</option>
             </select></label
-          ><button id="login">Acceso administrador</button
+          ><button id="login" aria-label="Acceso administrador">
+            Administración</button
           ><button id="logout" hidden>Salir</button>
         </nav>
       </div>
     </header>
     <main class="wrap">
-      <section class="hero">
+      <button id="returnEdit" hidden>Volver a administración</button>
+      <section class="cover" id="portada">
+        <div class="covertext">
+          <span class="kicker">Seguimiento de obra independiente</span>
+          <h1>Adrio <i>III</i></h1>
+          <p>
+            Cuatro plantas de viviendas, incluida la baja,<br />
+            y dos niveles de garaje.
+          </p>
+          <div class="coverstatus">
+            <span id="status" role="status"></span><small id="stamp"></small>
+          </div>
+        </div>
+        <figure>
+          <img
+            src="./assets/section.svg"
+            alt="Sección esquemática de los niveles del edificio"
+          />
+          <figcaption>Sección orientativa · sin escala</figcaption>
+        </figure>
+      </section>
+      <section class="outlook" aria-label="Previsiones y progreso">
+        <article>
+          <span class="eyelabel"><i class="dot teal"></i>Entrega optimista</span
+          ><strong id="early"></strong><small id="earlyDelta"></small>
+        </article>
+        <article>
+          <span class="eyelabel"
+            ><i class="dot amber"></i>Entrega pesimista</span
+          ><strong id="late"></strong><small id="lateDelta"></small>
+        </article>
+        <article>
+          <span class="eyelabel">Hitos confirmados</span
+          ><strong id="count"></strong><small id="expected"></small>
+        </article>
+      </section>
+      <div class="brief">
         <div>
-          <h1>Seguimiento de Obra Adrio III</h1>
-          <p>Cuatro plantas de viviendas y dos niveles de garaje.</p>
+          <small>Estado observado</small>
+          <p id="actual"></p>
         </div>
-        <div class="connection">
-          <div id="status" role="status">Conectando…</div>
-          <small id="stamp"></small>
+        <div>
+          <small>Próximo hito previsto</small>
+          <p id="next"></p>
         </div>
-      </section>
-      <section class="metrics" aria-label="Resumen de obra">
-        <article>
-          <small>Entrega optimista</small><strong id="early"></strong>
-        </article>
-        <article>
-          <small>Entrega pesimista</small><strong id="late"></strong>
-        </article>
-        <article>
-          <small>Fases completadas</small><strong id="count"></strong>
-        </article>
-      </section>
-      <section class="panel">
-        <div class="panelhead">
+      </div>
+      <section id="calendario" class="planning">
+        <div class="sectionTitle">
           <div>
+            <span class="kicker">Planificación</span>
             <h2>Calendario de obra</h2>
-            <small id="today"></small>
           </div>
           <div class="tabs" aria-label="Escenario">
             <button id="optimista">Optimista</button
-            ><button id="pesimista">Pesimista</button>
+            ><button id="pesimista">Pesimista</button
+            ><button id="comparar">Comparar</button>
           </div>
+        </div>
+        <div class="toolbar">
+          <div>
+            <button id="gantt">Gantt</button
+            ><button id="vertical">Por fases</button>
+          </div>
+          <label><input type="checkbox" id="baseline" /> Plan inicial</label
+          ><button id="goToday">Ir a hoy</button>
         </div>
         <div class="scroll" tabindex="0" aria-label="Calendario desplazable">
           <div id="chart"></div>
         </div>
-        <div class="summary">
-          <div>
-            <small>Actividad prevista</small>
-            <p id="current"></p>
-          </div>
-          <div>
-            <small>Próximo hito previsto</small>
-            <p id="next"></p>
-          </div>
-          <div>
-            <small>Hasta la entrega</small>
-            <p id="remaining"></p>
-          </div>
+        <p id="compareKey" hidden>
+          O · Optimista (arriba) &nbsp; P · Pesimista (abajo)
+        </p>
+        <div id="phaseList"></div>
+        <div class="chartfoot">
+          <span id="yearKey"></span><small id="today"></small>
         </div>
+        <details class="method">
+          <summary>Cómo leer las previsiones</summary>
+          <p>
+            Las dos previsiones parten de duraciones y solapamientos diferentes.
+            La línea de hoy indica el paso del tiempo. Solo los hitos
+            confirmados acreditan trabajos terminados. El trazo discontinuo
+            muestra el plan inicial cuando está seleccionado.
+          </p>
+        </details>
+      </section>
+      <div class="journey" id="journey" aria-label="Hitos de la obra"></div>
+      <section class="upcoming">
+        <div>
+          <span class="kicker">En el horizonte</span>
+          <h2>Próximos hitos</h2>
+        </div>
+        <div id="milestones"></div>
+      </section>
+      <section id="diario" class="journal">
+        <div class="sectionTitle">
+          <div>
+            <span class="kicker">Observaciones de la obra</span>
+            <h2>Diario de obra</h2>
+          </div>
+          <label
+            >Fase
+            <select id="filter"></select
+          ></label>
+        </div>
+        <div id="entries"></div>
+        <div id="comparePhotos"></div>
+      </section>
+      <section id="evolucion">
+        <span class="kicker">Histórico de entrega</span>
+        <h2>Evolución de las previsiones</h2>
+        <div id="forecasts"></div>
       </section>
       <section id="admin" class="panel pad" hidden>
         <h2>Administración</h2>
+        <details>
+          <summary>Diagnóstico de conexión</summary>
+          <p id="diag"></p>
+        </details>
+        <button id="viewAsVisitor">Vista de visitante</button
+        ><button id="newEntry" hidden>Nueva observación</button>
+        <div id="manageEntries"></div>
+        <form id="forecastNote" hidden>
+          <label
+            >Explicación de la revisión actual
+            <input id="reason" required maxlength="240" /></label
+          ><button>Guardar explicación pública</button>
+        </form>
         <p id="draft"></p>
         <p id="warning" role="alert"></p>
         <details id="editor">
@@ -153,6 +255,50 @@
       <div id="comparison"></div>
       <button id="apply">Confirmar restauración</button
       ><button id="back">Cancelar</button>
+    </dialog>
+    <dialog id="phaseDialog">
+      <div id="phaseBody"></div>
+      <form method="dialog"><button>Cerrar</button></form>
+    </dialog>
+    <dialog id="photoDialog">
+      <div id="photoBody"></div>
+      <form method="dialog"><button>Cerrar</button></form>
+    </dialog>
+    <dialog id="entryDialog">
+      <form id="entryForm">
+        <h2>Observación de obra</h2>
+        <label
+          >Fecha de observación<input
+            type="date"
+            id="observed"
+            required /></label
+        ><label>Fase<select id="entryPhase"></select></label
+        ><label
+          >Estado observado<select id="obState">
+            <option value="">Sin indicación</option>
+            <option value="pending">Pendiente</option>
+            <option value="active">En ejecución</option>
+            <option value="late">Retrasada respecto al plan</option>
+          </select></label
+        ><label>Título<input id="entryTitle" required maxlength="100" /></label
+        ><label
+          >Descripción<textarea
+            id="entryText"
+            required
+            maxlength="1500"
+          ></textarea></label
+        ><label
+          >Fotografía opcional<input
+            id="photoFile"
+            type="file"
+            accept="image/jpeg,image/png,image/webp" /></label
+        ><label>Pie de foto<input id="caption" maxlength="180" /></label>
+        <div id="entryPreview"></div>
+        <p id="entryError" role="alert"></p>
+        <button type="submit" id="previewEntry">Vista previa</button
+        ><button type="button" hidden id="publishEntry">Publicar</button
+        ><button type="button" id="cancelEntry">Cerrar</button>
+      </form>
     </dialog>
   </body>
 </html>

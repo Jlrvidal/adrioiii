@@ -108,7 +108,69 @@ assert.deepEqual(
   decode((await db.query('select state from public.schedule')).rows[0].state),
   state,
 )
+// The storage service manages these tables on Supabase. This fixture tests the
+// PostgreSQL policies; the hosted upload gateway is outside this local suite.
+await db.exec(`reset role; create schema storage;
+create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+create table storage.objects(bucket_id text references storage.buckets(id),name text,primary key(bucket_id,name));
+alter table storage.objects enable row level security;
+create policy preexisting_storage_grant on storage.objects for all to public using(true) with check(true);
+grant usage on schema storage to anon,authenticated;
+grant select,insert,update,delete on storage.objects to anon,authenticated;`)
+await db.exec(
+  await readFile(
+    new URL('../migrations/002_resident_portal.sql', import.meta.url),
+    'utf8',
+  ),
+)
+const photo = '12345678-1234-4123-8123-123456789abc.webp'
+const object = () =>
+  db.query("insert into storage.objects values('adrio-diary',$1)", [photo])
+const entry = () =>
+  db.query(
+    "insert into public.adrio_diary(observed,phase,title,body,photo) values(current_date,'foundation','Prueba','Contenido de prueba',$1)",
+    [photo],
+  )
+for (const role of ['anon', 'authenticated']) {
+  await db.exec(
+    'set role ' +
+      role +
+      ";set request.jwt.claim.sub='00000000-0000-4000-a000-000000000001'",
+  )
+  await assert.rejects(object(), { code: '42501' })
+  await assert.rejects(entry(), { code: '42501' })
+  const rows = (await db.query('select * from public.adrio_forecasts()')).rows
+  assert.deepEqual(Object.keys(rows[0]).sort(), [
+    'optimista',
+    'pesimista',
+    'published_at',
+    'reason',
+    'revision',
+  ])
+  assert.deepEqual([rows[0].optimista, rows[0].pesimista], [21, 28])
+  await db.exec('reset role')
+}
+await db.exec(`set role authenticated;set request.jwt.claim.sub='${owner}'`)
+await object()
+await assert.rejects(
+  db.exec("insert into storage.objects values('adrio-diary','image.svg')"),
+  { code: '42501' },
+)
+await db.exec('reset role; set role anon')
+assert.equal((await db.query('select * from storage.objects')).rows.length, 0)
+await db.exec('reset role;set role authenticated')
+await entry()
+await db.exec('reset role;set role anon')
+assert.equal((await db.query('select * from storage.objects')).rows.length, 1)
+assert.equal(
+  (await db.query('select * from public.adrio_diary')).rows.length,
+  1,
+)
+await db.exec('reset role;set role authenticated')
+await db.exec('delete from public.adrio_diary')
+await db.exec('reset role;set role anon')
+assert.equal((await db.query('select * from storage.objects')).rows.length, 0)
 await db.close()
 console.log(
-  'PostgreSQL migration, ACLs, validation, locks, conflict, compatibility and transactional history passed.',
+  'Both migrations, legacy history, admin locks, diary publication, storage RLS and public forecast projection passed.',
 )
