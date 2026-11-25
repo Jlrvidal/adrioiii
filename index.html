@@ -1,3 +1,158 @@
-<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Seguimiento de Obra Adrio III · Gantt</title><style>
-*{box-sizing:border-box}body{margin:0;background:#111820;color:#edf3f8;font:15px system-ui}main{max-width:850px;margin:auto;padding:16px}h1{font-size:26px;margin:8px 0}p,small{color:#aab9c8}section{background:#1b2632;border:1px solid #344453;border-radius:16px;padding:16px;margin:14px 0}h2{margin:0 0 10px;font-size:18px}.date{font-size:30px;font-weight:700;color:#a8d5ff}.line{margin:16px 0}.label{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-bottom:7px}.label span{flex:1}.label small{font-size:12px;text-align:right}input[type=checkbox]{width:23px;height:23px;accent-color:#56b88b}.track{position:relative;height:36px;background:repeating-linear-gradient(to right,#263645 0,#263645 calc(100% / var(--months) - 1px),#40505e calc(100% / var(--months) - 1px),#40505e calc(100% / var(--months)));border-radius:6px}.bar{position:absolute;height:30px;top:3px;background:#76a9d5;border-radius:6px;display:flex;align-items:center;justify-content:space-between;touch-action:none;cursor:grab;min-width:12px;color:#102333;user-select:none}.bar.done{outline:2px solid #54b98a}.bar.done b::before{content:"✓ "}.axis{position:relative;height:25px}.axis span{position:absolute;overflow:hidden;text-align:center;border-radius:4px;padding:4px 0;color:#111820;font-weight:700}.bar b{pointer-events:none}.track{overflow:visible}.handle{height:100%;width:12px;flex-shrink:0;cursor:ew-resize;display:grid;place-items:center;font-weight:bold;touch-action:none}.bar b{font-size:11px;overflow:hidden;white-space:nowrap}.axis{display:flex;justify-content:space-between;font-size:11px;color:#aab9c8}.buttons{display:flex;gap:8px;flex-wrap:wrap}button{background:#30465b;color:white;border:1px solid #526b82;padding:12px;border-radius:9px;font:inherit;cursor:pointer}button.primary{background:#286b51}details{margin-top:10px}input[type=month]{background:#263645;color:white;border:1px solid #526b82;padding:6px;border-radius:6px} .edit{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;font-size:12px} .edit label{display:grid;gap:3px}.hint{font-size:13px} .today-line{position:absolute;top:-3px;bottom:-3px;width:2px;background:#ffcf66;z-index:5;pointer-events:none;box-shadow:0 0 4px #111}.today-key{color:#ffcf66;font-weight:600}.public-view .bar{cursor:default;touch-action:auto}.public-view .handle{visibility:hidden}.public-view .label input{pointer-events:none}</style><main><section><div id="status" role="status">Conectando…</div><div class="buttons"><button id="login">Acceso administrador</button><button id="logout" hidden>Cerrar sesión</button><button id="retry" hidden>Reintentar guardado</button></div></section><h1>Seguimiento de Obra Adrio III</h1><p>Calendario de obra compartido · 4 plantas sobre rasante y 2 sótanos</p><section><div class="buttons" style="margin-bottom:12px"><button id="optimista">Optimista</button><button id="pesimista">Pesimista</button></div><small id="scenario">Entrega prevista</small><div class="date" id="delivery"></div><div id="count"></div></section><section><h2>Calendario interactivo</h2><p class="hint">Arrastra el centro de una barra para desplazarla. Arrastra sus extremos para cambiar su duración. Cada cambio en la fecha de fin desplaza las fases dependientes, conservando sus solapamientos. Los colores identifican años naturales. Marca la casilla para completar y bloquear una fase.</p><p id="today" class="today-key"></p><div id="chart"></div><div class="axis" id="axis"></div><details><summary>Editar fechas manualmente</summary><div id="manual"></div></details></section><section><div class="buttons"><button class="primary" id="share">Compartir por WhatsApp</button><button id="export">Exportar respaldo JSON</button><button id="reset">Restablecer</button></div><p class="hint">Consulta pública. Solo el administrador puede guardar cambios. Las fechas son estimaciones no oficiales.</p></section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script>
-const initial=[['Cimentación',0,3],['Dos plantas de garaje',2,4],['Estructura de las viviendas',5,4],['Fachadas y cerramientos',8,4],['Instalaciones y tabiquería',9,6],['Acabados interiores',13,5],['Trámites y entrega',18,3]].map(([name,s,d])=>({name,s,d,done:false}));const base=2026*12+11;const pessimistic=[[0,4],[3,5],[7,5],[11,5],[12,8],[17,7],[24,4]].map(([s,d],i)=>({...initial[i],s,d}));let data=structuredClone(initial),mode="optimista";let publicMode=null, published=null;let editable=false, revision=null, pending=null, saving=false;const db=window.ADRIO?.url && window.supabase ? window.supabase.createClient(window.ADRIO.url,window.ADRIO.key):null;let horizon=24,drag=null;const $=id=>document.getElementById(id);function date(m){let v=base+m;return new Date(Math.floor(v/12),v%12,1)}function fmt(m){return date(m).toLocaleDateString('es-ES',{month:'short',year:'numeric'})}function iso(m){let v=base+m;return `${Math.floor(v/12)}-${String(v%12+1).padStart(2,'0')}`}function fromIso(v){let [y,m]=v.split('-').map(Number);return y*12+m-1-base}function save(){if(!editable)return;pending={data:structuredClone(data),mode};try{localStorage.setItem('adrio-pending',JSON.stringify({revision,pending}))}catch(e){}flush()}async function flush(){if(saving||!pending||!editable)return;saving=true;const snapshot=pending;status('Guardando…');try{const {data:r,error}=await db.rpc('save_schedule',{expected:revision,next_state:snapshot});if(error)throw error;revision=r; if(pending===snapshot){pending=null;localStorage.removeItem('adrio-pending')}else{localStorage.setItem('adrio-pending',JSON.stringify({revision,pending}))}status('Sincronizado · '+new Date().toLocaleString('es-ES'));}catch(e){status('No guardado: '+e.message);$('retry').hidden=false;return}finally{saving=false}if(pending)flush()}function status(t){$('status').textContent=t}function permissions(){ $('logout').hidden=!editable;$('login').hidden=editable;$('reset').disabled=!editable;document.body.classList.toggle('public-view',!editable);document.querySelector('.hint').textContent=editable?'Arrastra las barras o sus extremos para editar. Marca las fases completadas.':'Calendario previsto de cada fase. La línea amarilla indica la fecha actual; los ticks indican fases completadas.';document.querySelectorAll('.handle').forEach(x=>x.style.visibility=editable?'visible':'hidden');document.querySelector('details').hidden=!editable;data.forEach((x,i)=>{$('c'+i).disabled=!editable;$('s'+i).disabled=$('e'+i).disabled=!editable||x.done})}async function load(){if(pending||drag||saving)return;const {data:r,error}=await db.from('schedule').select('state,revision,updated_at').eq('id',1).single();if(error){status('Error de conexión: '+error.message);return}published=structuredClone(r.state);data=structuredClone(published.data);mode=published.mode;if(!editable&&publicMode&&publicMode!==mode){data=project(publicMode);mode=publicMode}revision=r.revision;render();permissions();status('Última actualización: '+new Date(r.updated_at).toLocaleString('es-ES'))}async function auth(){const {data:r}=await db.auth.getUser();editable=r.user?.id===window.ADRIO.owner;if(editable&&published){data=structuredClone(published.data);mode=published.mode;publicMode=null;render()}permissions();if(editable){try{let p=JSON.parse(localStorage.getItem('adrio-pending'));if(p&&confirm('Hay cambios locales sin guardar. ¿Recuperarlos?')){if(p.revision!==revision){status('Conflicto: existe una versión remota más reciente. El respaldo local se conserva.');return}pending=p.pending;data=pending.data;mode=pending.mode;paint();flush()}}catch(e){}}}function end(){return Math.max(...data.map(x=>x.s+x.d))}const colors=['#9caebf','#76a9d5','#b39be4','#e5a65d','#72c6bd','#e0a1b7'];function color(m){return colors[((date(m).getFullYear()-2026)%colors.length+colors.length)%colors.length]}function segments(start,length,muted=false){let stops=[];for(let m=start;m<start+length;){let next=Math.min(start+length,m+12-date(m).getMonth());let c=color(m);if(muted)c+='26';stops.push(`${c} ${(m-start)/length*100}%`,`${c} ${(next-start)/length*100}%`);m=next}return 'linear-gradient(to right,'+stops.join(',')+')'}function propagate(i,old){for(let j=i+1;j<data.length;j++){if(data[j].done)continue;let prev=data[j-1],before=old[j-1],gap=old[j].s-(before.s+before.d);data[j].s=Math.max(0,prev.s,prev.s+prev.d+gap)}}function apply(i,s,d,old){data=structuredClone(old);let x=data[i];if(x.done||!Number.isFinite(s)||!Number.isFinite(d))return;let min=i?Math.max(data[i-1].s,data[i-1].s+data[i-1].d+Math.min(0,old[i].s-old[i-1].s-old[i-1].d)):0;s=Math.max(min,s);d=Math.max(1,d);x.s=s;x.d=d;propagate(i,old)}function paint(){$('scenario').textContent='Entrega prevista · '+mode;$('optimista').classList.toggle('primary',mode==='optimista');$('pesimista').classList.toggle('primary',mode==='pesimista');if(!drag)horizon=Math.max(24,Math.ceil((end()+3)/6)*6);$('delivery').textContent=fmt(end());$('count').textContent=`${data.filter(x=>x.done).length} de 7 fases completadas`;document.documentElement.style.setProperty('--months',horizon);data.forEach((x,i)=>{let b=$('b'+i);if(!b)return;b.parentElement.style.background=segments(0,horizon,true);b.style.background=segments(x.s,x.d);b.style.left=x.s/horizon*100+'%';b.style.width=x.d/horizon*100+'%';b.classList.toggle('done',x.done);b.querySelector('b').textContent=x.d+' m';$('t'+i).textContent=fmt(x.s)+' – '+fmt(x.s+x.d);$('c'+i).checked=x.done;$('s'+i).value=iso(x.s);$('e'+i).value=iso(x.s+x.d);$('s'+i).disabled=$('e'+i).disabled=!editable||x.done});let labels=[];for(let m=0;m<horizon;){let n=Math.min(horizon,m+12-date(m).getMonth());labels.push(`<span style="left:${m/horizon*100}%;width:${(n-m)/horizon*100}%;background:${color(m)}">${n-m<3?String(date(m).getFullYear()).slice(2):date(m).getFullYear()}</span>`);m=n}$('axis').innerHTML=labels.join('');paintToday()}function paintToday(){let now=new Date(),month=now.getFullYear()*12+now.getMonth()-base,days=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(),pos=month+(now.getDate()-1)/days; $('today').textContent='│ Hoy: '+now.toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})+(pos<0?' · antes del calendario':pos>horizon?' · después del calendario':'');document.querySelectorAll('.track').forEach(t=>{let l=t.querySelector('.today-line');if(!l){l=document.createElement('span');l.className='today-line';t.append(l)}l.hidden=pos<0||pos>horizon;l.style.left=pos/horizon*100+'%'})}function render(){ $('chart').innerHTML=data.map((x,i)=>`<div class="line"><div class="label"><input type="checkbox" id="c${i}" aria-label="Completar ${x.name}"><span>${x.name}</span><small id="t${i}"></small></div><div class="track"><div class="bar" id="b${i}"><span class="handle" data-mode="left">⋮</span><b></b><span class="handle" data-mode="right">⋮</span></div></div></div>`).join('');$('manual').innerHTML=data.map((x,i)=>`<div class="edit"><span>${x.name}</span><label>Inicio<input type="month" id="s${i}"></label><label>Fin<input type="month" id="e${i}"></label></div>`).join('');data.forEach((x,i)=>{let b=$('b'+i);$('c'+i).onchange=e=>{data[i].done=e.target.checked;save();paint()};b.onpointerdown=e=>{if(!editable||data[i].done)return;e.preventDefault();b.setPointerCapture(e.pointerId);drag={i,mode:e.target.dataset.mode||'move',start:e.clientX,scale:horizon/b.parentElement.clientWidth,old:structuredClone(data)} };b.onpointermove=e=>{if(!drag||drag.i!==i)return;let k=Math.round((e.clientX-drag.start)*drag.scale),o=drag.old[i],s=o.s,d=o.d;if(drag.mode==='move')s+=k;if(drag.mode==='right')d+=k;if(drag.mode==='left'){s=Math.min(o.s+o.d-1,o.s+k);s=Math.max(i?drag.old[i-1].s:0,s);d=o.s+o.d-s}apply(i,s,d,drag.old);paint()};b.onpointerup=b.onpointercancel=()=>{if(drag){drag=null;save();paint()}};$('s'+i).onchange=e=>{apply(i,fromIso(e.target.value),data[i].d,data);save();paint()};$('e'+i).onchange=e=>{apply(i,data[i].s,fromIso(e.target.value)-data[i].s,data);save();paint()}});paint()}function project(m){let target=m==='pesimista'?pessimistic:initial,source=published||{data,mode},prev=source.mode==='pesimista'?pessimistic:initial;let result=target.map((t,i)=>{let x=source.data[i];return x.done?structuredClone(x):{...t,s:Math.max(0,t.s+x.s-prev[i].s),d:Math.max(1,t.d+x.d-prev[i].d)}});for(let i=1;i<result.length;i++){if(result[i].done)continue;let gap=target[i].s-target[i-1].s-target[i-1].d;result[i].s=Math.max(result[i].s,result[i-1].s,result[i-1].s+result[i-1].d+gap)}return result}function preset(m){if(!editable){if(!published)return;publicMode=m;data=m===published.mode?structuredClone(published.data):project(m);mode=m;render();permissions();return;}if(mode===m)return;if(!confirm('¿Aplicar previsión '+m+'? Se recalcularán las fases pendientes; las completadas se conservarán.'))return;let target=m==='pesimista'?pessimistic:initial;let previous=structuredClone(data);data=target.map((t,i)=>{let x=previous[i];if(x.done)return x;let delay=Math.max(0,x.s-(mode==='pesimista'?pessimistic:initial)[i].s);let extra=Math.max(0,x.d-(mode==='pesimista'?pessimistic:initial)[i].d);return {...t,s:t.s+delay,d:t.d+extra,done:false}});for(let i=1;i<data.length;i++){if(data[i].done)continue;let gap=target[i].s-target[i-1].s-target[i-1].d;data[i].s=Math.max(data[i].s,data[i-1].s,data[i-1].s+data[i-1].d+gap)};mode=m;save();paint()}$('optimista').onclick=()=>preset('optimista');$('pesimista').onclick=()=>preset('pesimista');$('reset').onclick=()=>{if(editable&&confirm('¿Restablecer todas las fechas?')){data=structuredClone(mode==='pesimista'?pessimistic:initial);save();paint()}};$('share').onclick=()=>{let t='🏗️ Seguimiento de Obra Adrio III ('+mode+')\nEntrega prevista: '+fmt(end())+'\n\n'+data.map(x=>(x.done?'✅ ':'▫️ ')+x.name+': '+fmt(x.s)+' – '+fmt(x.s+x.d)).join('\n');window.open('https://wa.me/?text='+encodeURIComponent(t+'\n'+location.href),'_blank')};$('export').onclick=()=>{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({data,mode,revision},null,2)],{type:'application/json'}));a.download='adrio-respaldo.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};render();permissions();setInterval(paintToday,60000);$('retry').onclick=flush;$('login').onclick=async()=>{let email=prompt('Correo de administrador');if(!email)return;const {error}=await db.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href.split('#')[0]}});status(error?error.message:'Revisa tu correo para acceder')};$('logout').onclick=async()=>{if(pending||saving){status('Guarda los cambios antes de salir');return}await db.auth.signOut();editable=false;publicMode=null;permissions();await load()};if(db){load().then(auth);setInterval(load,15000);window.addEventListener('online',flush)}else status('Configura Supabase antes de publicar');</script></html>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; connect-src https://twckvmhkdntuqpsiobnm.supabase.co; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <title>Seguimiento de Obra Adrio III</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script defer src="./vendor/supabase-2.119.2.js"></script>
+    <script defer src="./config.js"></script>
+    <script type="module" src="./src/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <div class="wrap top">
+        <strong>Adrio III</strong>
+        <nav>
+          <label
+            >Tema
+            <select id="theme">
+              <option value="system">Sistema</option>
+              <option value="light">Claro</option>
+              <option value="dark">Oscuro</option>
+            </select></label
+          ><button id="login">Acceso administrador</button
+          ><button id="logout" hidden>Salir</button>
+        </nav>
+      </div>
+    </header>
+    <main class="wrap">
+      <section class="hero">
+        <div>
+          <h1>Seguimiento de Obra Adrio III</h1>
+          <p>Cuatro plantas de viviendas y dos niveles de garaje.</p>
+        </div>
+        <div class="connection">
+          <div id="status" role="status">Conectando…</div>
+          <small id="stamp"></small>
+        </div>
+      </section>
+      <section class="metrics" aria-label="Resumen de obra">
+        <article>
+          <small>Entrega optimista</small><strong id="early"></strong>
+        </article>
+        <article>
+          <small>Entrega pesimista</small><strong id="late"></strong>
+        </article>
+        <article>
+          <small>Fases completadas</small><strong id="count"></strong>
+        </article>
+      </section>
+      <section class="panel">
+        <div class="panelhead">
+          <div>
+            <h2>Calendario de obra</h2>
+            <small id="today"></small>
+          </div>
+          <div class="tabs" aria-label="Escenario">
+            <button id="optimista">Optimista</button
+            ><button id="pesimista">Pesimista</button>
+          </div>
+        </div>
+        <div class="scroll" tabindex="0" aria-label="Calendario desplazable">
+          <div id="chart"></div>
+        </div>
+        <div class="summary">
+          <div>
+            <small>Actividad prevista</small>
+            <p id="current"></p>
+          </div>
+          <div>
+            <small>Próximo hito previsto</small>
+            <p id="next"></p>
+          </div>
+          <div>
+            <small>Hasta la entrega</small>
+            <p id="remaining"></p>
+          </div>
+        </div>
+      </section>
+      <section id="admin" class="panel pad" hidden>
+        <h2>Administración</h2>
+        <p id="draft"></p>
+        <p id="warning" role="alert"></p>
+        <details id="editor">
+          <summary>Editar fechas y confirmar hitos</summary>
+          <div id="manual"></div>
+        </details>
+        <div class="actions">
+          <button id="retry">Sincronizar</button
+          ><button id="discard">Descartar borrador</button
+          ><button id="history">Historial</button
+          ><button id="export">Exportar JSON</button
+          ><label class="button"
+            >Importar JSON
+            <input
+              id="import"
+              type="file"
+              accept=".json,application/json" /></label
+          ><button id="reset">Restablecer calendario</button>
+        </div>
+      </section>
+      <footer>
+        <p>
+          Previsiones orientativas, sin carácter oficial. Las fechas pueden
+          cambiar.
+        </p>
+        <div class="actions">
+          <button id="share">Compartir planificación</button
+          ><button id="copy">Copiar enlace</button>
+        </div>
+        <span id="notice" role="status"></span>
+      </footer>
+    </main>
+    <dialog id="auth">
+      <form id="authform">
+        <h2>Acceso administrador</h2>
+        <label
+          >Correo electrónico<input
+            id="email"
+            type="email"
+            autocomplete="username"
+            required /></label
+        ><label
+          >Contraseña<input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            required /></label
+        ><label
+          ><input id="visible" type="checkbox" /> Mostrar contraseña</label
+        >
+        <p id="autherror" role="alert"></p>
+        <button id="enter">Entrar</button
+        ><button type="button" id="cancel">Cancelar</button>
+      </form>
+    </dialog>
+    <dialog id="versions">
+      <h2>Historial de publicaciones</h2>
+      <div id="list"></div>
+      <button id="close">Cerrar</button>
+    </dialog>
+    <dialog id="preview">
+      <h2>Vista previa de restauración</h2>
+      <p>
+        Al confirmar se publicará una nueva revisión, incluidos los hitos de
+        esta copia.
+      </p>
+      <div id="comparison"></div>
+      <button id="apply">Confirmar restauración</button
+      ><button id="back">Cancelar</button>
+    </dialog>
+  </body>
+</html>

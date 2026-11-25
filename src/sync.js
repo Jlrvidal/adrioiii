@@ -1,0 +1,202 @@
+import { defaults, validate } from './schedule.js'
+const equal = (a, b) =>
+  a.version === b.version &&
+  a.completed.every((v, i) => v === b.completed[i]) &&
+  ['optimista', 'pesimista'].every((m) =>
+    a.plans[m].every(
+      (p, i) => p.s === b.plans[m][i].s && p.d === b.plans[m][i].d,
+    ),
+  )
+export class ScheduleStore {
+  constructor(api, storage, notify) {
+    Object.assign(this, {
+      api,
+      storage,
+      notify,
+      published: defaults(),
+      revision: null,
+      stamp: null,
+      admin: false,
+      draft: null,
+      busy: false,
+      editing: false,
+      conflict: false,
+      epoch: 0,
+      change: 0,
+      read: 0,
+      message: 'Conectando…',
+    })
+  }
+  get state() {
+    return this.draft?.state ?? this.published
+  }
+  get key() {
+    return 'adrio:v2:' + this.api.scope + ':' + this.api.owner
+  }
+  inform(message) {
+    this.message = message
+    this.notify()
+  }
+  authorize(admin) {
+    if (this.admin === admin) return
+    this.epoch++
+    this.admin = admin
+    this.draft = null
+    this.conflict = false
+    this.editing = false
+    this.busy = false
+    if (admin)
+      try {
+        const raw = this.storage.getItem(this.key)
+        if (raw) {
+          const d = JSON.parse(raw)
+          validate(d.state)
+          if (
+            !Number.isSafeInteger(d.base) ||
+            d.base < 0 ||
+            typeof d.restore !== 'boolean'
+          )
+            throw Error()
+          this.draft = d
+        }
+      } catch {
+        this.inform('No se pudo recuperar el borrador local.')
+      }
+    this.notify()
+  }
+  async refresh() {
+    if (this.busy || this.editing) return
+    const read = ++this.read,
+      epoch = this.epoch,
+      change = this.change
+    try {
+      const row = await this.api.load()
+      if (
+        read !== this.read ||
+        epoch !== this.epoch ||
+        change !== this.change ||
+        this.busy ||
+        this.editing ||
+        this.viewingEdit?.()
+      )
+        return
+      if (this.revision !== row.revision || !equal(this.published, row.state))
+        this.published = row.state
+      this.revision = row.revision
+      this.stamp = row.updated_at
+      if (this.draft && this.draft.base !== row.revision) {
+        if (equal(this.draft.state, row.state)) {
+          this.draft = null
+          this.storage.removeItem(this.key)
+        } else {
+          this.conflict = true
+          this.inform(
+            'Conflicto de versiones. Exporta tu borrador antes de cargar la publicación.',
+          )
+          return
+        }
+      }
+      this.conflict = false
+      this.inform(
+        this.draft ? 'Borrador pendiente' : 'Publicación sincronizada',
+      )
+      if (this.draft) await this.flush()
+    } catch (e) {
+      if (read === this.read && epoch === this.epoch)
+        this.inform(
+          (this.stamp
+            ? 'Sin conexión · última publicación en memoria'
+            : 'Sin conexión · calendario inicial') +
+            ' · ' +
+            e.message,
+        )
+    }
+  }
+  persist() {
+    try {
+      this.storage.setItem(this.key, JSON.stringify(this.draft))
+      return true
+    } catch {
+      this.inform(
+        'Almacenamiento local no disponible. Exporta una copia antes de salir.',
+      )
+      return false
+    }
+  }
+  stage(state, restore = false) {
+    if (!this.admin || this.conflict || this.revision === null)
+      throw Error('Se necesita una publicación verificada para editar.')
+    this.change++
+    this.draft = {
+      base: this.draft?.base ?? this.revision,
+      state: validate(state),
+      restore: restore || Boolean(this.draft?.restore),
+    }
+    const durable = this.persist()
+    this.notify()
+    if (durable) this.flush()
+  }
+  discard() {
+    if (!this.admin || this.busy) return
+    this.storage.removeItem(this.key)
+    this.draft = null
+    this.change++
+    this.conflict = false
+    this.notify()
+    this.refresh()
+  }
+  async flush() {
+    if (
+      !this.admin ||
+      this.busy ||
+      this.conflict ||
+      !this.draft ||
+      this.revision !== this.draft.base
+    )
+      return
+    const snapshot = this.draft,
+      epoch = this.epoch
+    this.busy = true
+    this.read++
+    this.inform('Guardando…')
+    try {
+      const ack = await this.api.save(
+        snapshot.base,
+        snapshot.state,
+        snapshot.restore,
+      )
+      if (epoch !== this.epoch) return
+      if (
+        ack.revision !== snapshot.base + 1 ||
+        !Number.isFinite(Date.parse(ack.updated_at))
+      )
+        throw Error('Confirmación no válida.')
+      this.published = snapshot.state
+      this.revision = ack.revision
+      this.stamp = ack.updated_at
+      if (snapshot === this.draft) {
+        this.draft = null
+        this.storage.removeItem(this.key)
+      } else {
+        this.draft = { ...this.draft, base: ack.revision }
+        this.persist()
+      }
+      this.inform('Publicación sincronizada')
+    } catch (e) {
+      if (epoch !== this.epoch) return
+      this.conflict = e.code === '40001'
+      this.inform(
+        this.conflict
+          ? 'Conflicto de versiones. Revisa la publicación y conserva tu copia.'
+          : 'Guardado pendiente · ' + e.message,
+      )
+      return
+    } finally {
+      if (epoch === this.epoch) {
+        this.busy = false
+        this.notify()
+      }
+    }
+    if (this.draft) await this.flush()
+  }
+}

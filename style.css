@@ -1,0 +1,379 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f4ef;
+  --paper: #fffefa;
+  --ink: #182e40;
+  --muted: #53656b;
+  --line: #d5dcd9;
+  --accent: #31675c;
+  --tint: #e4efea;
+  --bar: #426780;
+  --over: #925d34;
+  --marker: #b04433;
+  font:
+    16px/1.5 system-ui,
+    sans-serif;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #111d26;
+  --paper: #1b2933;
+  --ink: #ecf1ef;
+  --muted: #bbcacd;
+  --line: #41515b;
+  --accent: #b4d9cd;
+  --tint: #2d433f;
+  --bar: #426780;
+  --over: #87502d;
+  --marker: #ff967d;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+header {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.wrap {
+  width: min(1200px, 94%);
+  margin: auto;
+}
+.top,
+.panelhead,
+nav,
+.actions,
+footer,
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.top {
+  min-height: 64px;
+}
+.top strong,
+h1,
+h2,
+.metrics strong {
+  font-family: Georgia, serif;
+  font-weight: 500;
+}
+.top strong {
+  font-size: 1.65rem;
+}
+.hero {
+  padding: 40px 0 20px;
+}
+.hero p,
+footer p {
+  color: var(--muted);
+}
+h1 {
+  font-size: clamp(2.1rem, 4.8vw, 3.9rem);
+  line-height: 1.05;
+  letter-spacing: -0.045em;
+  margin: 0;
+}
+h2 {
+  font-size: 1.65rem;
+  margin: 0;
+}
+p {
+  margin: 0.5rem 0;
+}
+small,
+nav label,
+.connection {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+#status {
+  color: var(--accent);
+  font-weight: 650;
+}
+.metrics,
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+article,
+.summary > div {
+  padding: 18px 24px;
+  background: var(--paper);
+}
+.metrics,
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.metrics strong {
+  display: block;
+  font-size: clamp(1.5rem, 3vw, 2.65rem);
+}
+.panel {
+  background: var(--paper);
+  margin-top: 20px;
+}
+.panelhead,
+.pad {
+  padding: 20px 24px;
+}
+button,
+.button,
+select,
+input {
+  font: inherit;
+  color: inherit;
+}
+button,
+.button,
+select {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+button:hover,
+.button:hover {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+button[aria-pressed='true'],
+#enter,
+#share {
+  background: var(--ink);
+  color: var(--paper);
+}
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.scroll {
+  overflow: auto;
+  border-block: 1px solid var(--line);
+}
+#chart {
+  --label: 205px;
+  position: relative;
+}
+.row {
+  display: grid;
+  grid-template-columns: var(--label) 1fr;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.caption {
+  position: sticky;
+  left: 0;
+  background: var(--paper);
+  padding: 10px 14px;
+  z-index: 3;
+  border-right: 1px solid var(--line);
+  font-size: 0.89rem;
+  font-weight: 600;
+}
+.caption small {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 400;
+}
+.track,
+.months,
+.years,
+.gridhead {
+  position: relative;
+}
+.track {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  background: repeating-linear-gradient(
+    to right,
+    var(--line) 0 1px,
+    transparent 1px var(--step)
+  );
+}
+.bar {
+  position: absolute;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bar);
+  border-radius: 4px;
+  color: white;
+  font-size: 0.73rem;
+  white-space: nowrap;
+}
+.bar.done {
+  background: #326451;
+}
+.bar.over {
+  background: var(--over);
+}
+.bar.editable {
+  touch-action: none;
+  cursor: grab;
+}
+.handle {
+  width: 18px;
+  text-align: center;
+  cursor: ew-resize;
+}
+.years,
+.months {
+  display: flex;
+  height: 25px;
+  font-size: 0.7rem;
+}
+.years span,
+.months span {
+  padding-left: 4px;
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+}
+.yearline,
+.todayline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  border-left: 1px solid var(--muted);
+}
+.todayline {
+  border-color: var(--marker);
+  border-width: 2px;
+  z-index: 2;
+}
+.todayline b {
+  background: var(--marker);
+  color: var(--paper);
+  font-size: 0.65rem;
+  padding: 2px;
+}
+.overlay {
+  position: absolute;
+  inset: 0 0 0 var(--label);
+  pointer-events: none;
+}
+.summary p {
+  font-size: 0.93rem;
+}
+.actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+footer {
+  padding: 20px 0 40px;
+  font-size: 0.9rem;
+}
+dialog {
+  max-width: min(94vw, 650px);
+  max-height: 85vh;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+dialog::backdrop {
+  background: #14263299;
+}
+dialog form > label,
+.edit {
+  display: block;
+  margin: 14px 0;
+}
+input:not([type='checkbox']) {
+  padding: 6px;
+  max-width: 100%;
+}
+form input:not([type='checkbox']) {
+  display: block;
+  width: 100%;
+}
+details summary {
+  cursor: pointer;
+}
+.edit {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.edit label {
+  display: inline-grid;
+  margin: 4px;
+}
+.button input {
+  width: 10em;
+  font-size: 0.8em;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 600px) {
+  .wrap {
+    width: 94%;
+  }
+  .hero {
+    padding: 25px 0 16px;
+  }
+  .top {
+    padding: 8px 0;
+  }
+  .top nav {
+    gap: 4px;
+  }
+  nav button,
+  nav select {
+    font-size: 0.8rem;
+    padding: 7px;
+  }
+  .metrics article {
+    padding: 9px;
+  }
+  .metrics small {
+    font-size: 0.7rem;
+  }
+  .metrics strong {
+    font-size: 1.25rem;
+  }
+  .summary {
+    grid-template-columns: 1fr;
+  }
+  .summary > div {
+    padding: 8px 14px;
+  }
+  .panelhead,
+  .pad {
+    padding: 14px;
+  }
+  .panelhead {
+    gap: 8px;
+  }
+  #chart {
+    --label: 118px;
+  }
+  .caption {
+    font-size: 0.77rem;
+    padding: 8px;
+  }
+  .caption small {
+    font-size: 0.68rem;
+  }
+}

@@ -1,2 +1,65 @@
-# adrioiii
-Small app to track adrio iii completion
+# Seguimiento de Obra Adrio III
+
+Calendario público de las cuatro plantas de viviendas y los dos sótanos de Adrio III. El cambio de escenario es local. Las fechas son estimaciones mensuales. Una fase completada representa un hito confirmado por el administrador. El recuento de fases no mide el porcentaje de obra ejecutada.
+
+## Probar en el ordenador
+
+Desde la carpeta del repositorio, ejecuta `python3 -m http.server 8080 --bind 127.0.0.1` y abre `http://127.0.0.1:8080`. El frontend estático funciona sin compilación ni instalación de paquetes. La configuración incluida apunta al proyecto real. Para probar escrituras utiliza otro proyecto o las pruebas simuladas.
+
+## Modelo y archivos
+
+| Archivo | Responsabilidad |
+|---|---|
+| `config.js` | URL base, clave pública existente y UUID del administrador |
+| `index.html`, `style.css` | Panel, diálogos, tema y política CSP |
+| `src/schedule.js` | Calendario por meses, dependencias, solapamientos, validación y lectura del formato original |
+| `src/chart.js` | Fases y eje temporal, edición con puntero, cambio confirmado al soltar |
+| `src/app.js` | Sesión, formularios, selección de escenario, copias y vistas previas |
+| `src/backend.js` | Cliente de Supabase, lectura de la fila pública y llamadas RPC |
+| `src/sync.js` | Revisión publicada, borrador pendiente, reintentos y conflictos |
+| `vendor/` | Supabase JS 2.119.2 y licencia MIT. Para actualizar, sustituye el archivo por la distribución UMD de una versión exacta, actualiza la referencia y repite las pruebas |
+| `migrations/` | Inventario de solo lectura y migración transaccional 001 |
+| `tests/` | Pruebas de dominio, sincronización, navegador y PostgreSQL |
+
+El mes cero es diciembre de 2026. El fin es exclusivo. Una fase que va de diciembre a marzo dura tres meses. Cada fase depende de la anterior. Las tablas de solapamiento de `schedule.js` y la validación SQL tienen que coincidir. Al editar se conserva la holgura adicional de cada descendiente. La previsión optimista y la pesimista se editan por separado. Confirmar un hito copia las fechas al otro escenario y bloquea ambos. Una incompatibilidad con las dependencias exige revisar las fechas antes de confirmar. La aplicación admite inicios desde cinco años antes de la base y fines hasta veinte años después.
+
+La fila 1 de `public.schedule` contiene la publicación. La lectura convierte el formato original en memoria. La primera publicación del administrador guarda la versión 2 y una proyección compatible con el lector anterior. La base comprueba la revisión, conserva la versión previa e incrementa el número en una sola transacción. Un cambio de escenario no entra en este flujo.
+
+## Preparar Supabase y verificar el esquema existente
+
+1. En el proyecto correcto, abre **Connect** y copia la Project URL. En **Settings → API Keys** identifica la publishable key. Comprueba ambos valores en `config.js`. La URL debe terminar en `.supabase.co`, sin `/rest/v1/`, `/auth/v1/`, parámetros o fragmentos. Si cambias de proyecto, actualiza también el host de `connect-src` en `index.html`. Conserva los valores actuales para Adrio III.
+2. En **SQL Editor → New query** ejecuta `migrations/preflight.sql`. Conserva los resultados en privado. El repositorio original no contenía el DDL de producción. Comprueba la fila 1, el tipo JSON de estado, las columnas del historial y sus marcas de tiempo. Revisa todas las funciones, vistas, reglas de acceso y disparadores que permitan leer historial o modificar esas tablas. Si existen rutas adicionales con permisos elevados, ajusta la migración en una copia antes de aplicarla. Comprueba también las concesiones heredadas de otros roles.
+3. Haz una copia privada de datos y esquema. Desde **Connect**, usa los datos de la conexión directa o el *session pooler*. Con el cliente PostgreSQL compatible y las variables libpq `PGHOST`, `PGPORT`, `PGDATABASE` y `PGUSER` configuradas, ejecuta `pg_dump -W -Fc -n public -f adrio-antes.dump`. Guarda la copia fuera del repositorio. Restaura primero en una base de ensayo que ya contenga Auth y los roles de Supabase. Para copias posteriores incluye también `-n adrio_private`.
+4. En la copia, comprueba que `schedule_history` tiene `state`, `revision` y una columna `updated_at`, `created_at`, `saved_at` o `changed_at`. Si se usa otro nombre, adapta la consulta del historial y la comprobación inicial a la definición real. Revisa cualquier restricción o disparador existente que exija campos de estado concretos. La migración está pensada para un proyecto dedicado. Cambia también los privilegios predeterminados del rol que la ejecuta para futuros objetos. Revisa el efecto en otras aplicaciones si comparten base.
+5. En **Authentication → Sign In / Providers**, habilita el proveedor Email y desactiva **Allow new users to sign up** y los accesos anónimos de Auth. La lectura pública funciona con la clave pública. En **Authentication → Users**, verifica el correo y el UUID de la única cuenta administradora. El UUID debe coincidir con `owner` y con `adrio_is_admin()` en la migración. Si es una instalación nueva, **Add user → Create new user**, introduce correo y contraseña, confirma la cuenta y usa su UUID en ambos sitios. Para la instalación existente conserva su UUID.
+6. Si la cuenta existente se creó mediante enlace mágico y carece de contraseña, asígnala una vez mediante la administración de usuarios. Si tu panel no ofrece esa edición, utiliza la operación oficial `auth.admin.updateUserById(uuid, {password})` desde un entorno administrativo privado con el SDK y una clave secreta. Introduce el secreto y la contraseña mediante el gestor de secretos de ese entorno. No los pongas en el sitio, el historial de comandos, Git ni capturas. Confirma que el correo de la cuenta pertenece al administrador.
+7. En el **SQL Editor** de ensayo, abre una nueva consulta, pega el archivo completo `migrations/001_production.sql` y pulsa **Run** una vez como propietario. Si falla, la transacción se revierte. Revisa el error antes de repetir. La migración conserva los registros, cierra el RPC antiguo, restringe ambas tablas y crea el historial privado de las revisiones nuevas. Solo el RPC autorizado puede publicar o restaurar. Conserva `adrio_private` fuera de los esquemas expuestos por la Data API.
+8. Sirve una copia del frontend con la URL, clave, CSP y UUID de ensayo. Abre una ventana privada, cambia el escenario y comprueba que solo hay lecturas de `schedule`. Entra con una cuenta distinta del administrador y verifica la vista de lectura. Entra con el administrador, cambia un mes, recarga, comprueba la publicación desde otra ventana y restaura la revisión desde **Historial**. Repite con dos ventanas editando la misma revisión para comprobar el conflicto. El SQL Editor con rol propietario no reproduce las restricciones de un visitante.
+9. Con la copia verificada y autorización para el despliegue, repite los pasos de copia, Auth y migración en producción. Guarda la salida del preflight y la revisión anterior para poder comparar. Ejecuta la migración antes del cambio de frontend.
+
+[Configuración de Auth](https://supabase.com/docs/guides/auth/general-configuration) · [Contraseñas](https://supabase.com/docs/guides/auth/passwords) · [Administración de una cuenta existente](https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid)
+
+## Publicar y volver atrás
+
+1. Guarda el SHA servido antes del cambio y el origen de publicación de **GitHub → Settings → Pages**. El código parte de `d8b8b6f`. Revisa los cambios en `feature/production-readiness`, ejecuta las pruebas y abre una pull request hacia la rama que publica Pages.
+2. Tras verificar la copia y aplicar la migración autorizada, fusiona la pull request. Si Pages ya publica este repositorio, conserva su origen. Para habilitarlo desde cero, elige **Settings → Pages → Build and deployment → Deploy from a branch**, selecciona la rama aprobada y **/(root)** y pulsa **Save**. Espera al despliegue correcto en **Actions**.
+3. Abre la URL pública en una ventana privada. Deben aparecer siete fases y una fecha de publicación. En **Network**, la lectura debe terminar en `/rest/v1/schedule` y devolver 200. Comprueba ambos escenarios y un enlace de WhatsApp en el móvil. Ensaya las operaciones de escritura en la copia de pruebas.
+4. Ante un fallo visual, prepara una PR con los archivos estáticos del último despliegue bueno y conserva la URL base corregida. **Para volver al prototipo d8b8b6f usa solo una vista pública de emergencia**. Su HTML anterior insertaba datos sin escapar y compartía la URL completa. Es preferible volver a la última revisión endurecida o corregir la rama actual. La migración mantiene el formato de lectura antiguo y bloquea sus escrituras. Mantén cerrados los permisos anteriores.
+5. Si el problema son las fechas, usa **Historial → Revisión → Confirmar restauración**. Esto crea una revisión. Si el problema es el esquema, conserva el volcado y prepara una migración correctiva verificada en la copia. Una restauración completa del volcado sobre producción podría perder revisiones posteriores.
+
+[Configuración de GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
+
+## Operación y recuperación
+
+- El estado inicial sin conexión permite consultar ambos escenarios. Si una lectura posterior falla, se conserva en memoria la última publicación confirmada con su fecha. Para una carga totalmente desconectada también deben estar disponibles los archivos del sitio.
+- El administrador edita una publicación verificada. Al soltar la barra, confirmar el mes o marcar un hito, el navegador conserva el borrador con su revisión, URL del proyecto y UUID. El cliente espera la confirmación del servidor antes de registrar el guardado. Una pestaña visible comprueba la publicación cada minuto y vuelve a comprobarla al recuperar conexión o visibilidad.
+- Ante un conflicto, exporta el borrador JSON, descártalo para cargar la última publicación y revisa las diferencias antes de volver a editar. Importar una copia completa permite restaurar los dos escenarios y los hitos históricos. Revisa la vista previa y confirma solo la revisión que deseas publicar. Mantén una única pestaña editora por perfil de navegador para evitar que dos borradores locales compartan almacenamiento. Usa perfiles distintos para probar edición concurrente.
+- Los navegadores privados pueden borrar los cambios locales al cerrar. Si el almacenamiento falla, exporta el JSON antes de salir. El prototipo dejaba borradores sin identificación de propietario en la clave `adrio-pending`. Si existe uno, conserva en privado el objeto `pending` de esa clave e impórtalo manualmente después de comprobar su procedencia y revisar la vista previa.
+- Si falla el acceso, comprueba correo confirmado, contraseña, UUID, proveedor Email, red y disponibilidad del proyecto. Un error de permisos al verificar el administrador puede indicar que falta la migración. Tras corregirla vuelve a iniciar sesión. Las operaciones normales de acceso no envían correo.
+- Si aparece un error de conexión, comprueba el host en la red del navegador, la clave pública, el CSP y la fila 1. Un 404 con ruta duplicada apunta a una URL base incorrecta. Una fila ausente o un estado inválido necesitan revisión en SQL Editor. Evita inicializar o sobrescribir la base para salir de ese error.
+- En Free, revisa **Usage** y conserva copias externas periódicas. Supabase puede pausar proyectos con poca actividad durante siete días. Para reactivarlo selecciona el proyecto pausado en el panel y pulsa **Restore project** si está disponible. Comprueba la fecha de restauración que muestre el panel. Cuando vuelva a estar activo, recarga y verifica la publicación. [Disponibilidad y copias en Free](https://supabase.com/docs/guides/deployment/going-into-prod)
+- El CSP se entrega mediante una etiqueta meta. Pages no ofrece configuración de cabeceras HTTP propias para este sitio. Directivas como `frame-ancestors` requieren una cabecera y no se pueden aplicar desde esa etiqueta. Los sitios Pages bajo el mismo dominio comparten origen y almacenamiento web. Aloja únicamente proyectos de confianza bajo ese origen o utiliza un dominio dedicado. El SDK mantiene la sesión en el navegador. Protege el origen y el dispositivo administrador. No publiques secretos en ningún archivo servido por Pages.
+
+## Pruebas
+
+Con Node moderno, ejecuta `node --test tests/*.test.js`. Las pruebas adicionales usan herramientas de desarrollo opcionales. Instálalas en una copia de trabajo con `npm install --no-save --package-lock=false @electric-sql/pglite@0.3.14 playwright`. Ejecuta `node tests/postgres.mjs`, después `npx playwright install chromium` y `node tests/browser.mjs`. Puedes indicar un navegador instalado con `BROWSER_EXECUTABLE` y una carpeta de capturas con `SHOTS`. PostgreSQL usa una base efímera con datos de prueba. Playwright simula el servicio Auth y la API. La distribución del sitio no necesita ninguna de estas herramientas.
