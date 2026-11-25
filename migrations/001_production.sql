@@ -7,19 +7,15 @@ begin
   if (select count(*) from public.schedule) <> 1 or not exists
     (select from public.schedule where id=1 and revision>=0 and state is not null and updated_at is not null)
   then raise exception 'Expected one existing schedule with id 1'; end if;
-  if to_regclass('public.schedule_history') is null or
-     (select count(*) from information_schema.columns where table_schema='public' and table_name='schedule_history' and column_name in ('revision','state'))<>2 or
-     not exists(select from information_schema.columns where table_schema='public' and table_name='schedule_history' and column_name in ('updated_at','created_at','saved_at','changed_at'))
-  then raise exception 'Inspect legacy history layout and adapt history projection before migration'; end if;
+  if to_regprocedure('public.save_schedule(bigint,jsonb)') is null or
+     (select count(*) from information_schema.columns where table_schema='public'
+      and table_name='schedule_history' and is_nullable='NO'
+      and (column_name,data_type) in (('revision','bigint'),('state','jsonb'),('updated_at','timestamp with time zone'))) <> 3
+  then raise exception 'Expected original Adrio III RPC and schedule_history layout; check schema drift'; end if;
 end $$;
 
 create schema adrio_private;
 revoke all on schema adrio_private from public,anon,authenticated;
-create table adrio_private.history (
- revision bigint primary key, state jsonb not null, updated_at timestamptz not null
-);
-alter table adrio_private.history enable row level security;
-revoke all on adrio_private.history from public, anon, authenticated;
 alter table public.schedule enable row level security;
 alter table public.schedule_history enable row level security;
 -- Existing policies combine with OR. Replace policies only on these two tables.
@@ -92,7 +88,7 @@ begin
     then raise exception 'Hito completado bloqueado'; end if;
   end loop;
  end if;
- insert into adrio_private.history values(old.revision,old.state,old.updated_at);
+ insert into public.schedule_history(revision,state,updated_at) values(old.revision,old.state,old.updated_at);
  -- Keep older public readers functional after a frontend rollback.
  proposed:=proposed || jsonb_build_object('mode','optimista','data',(
    select jsonb_agg(jsonb_build_object('name',(array['Cimentación','Dos plantas de garaje','Estructura de las viviendas','Fachadas y cerramientos','Instalaciones y tabiquería','Acabados interiores','Trámites y entrega'])[ord::int],
@@ -105,11 +101,7 @@ create function public.adrio_history() returns table(revision bigint,state jsonb
 language plpgsql stable security definer set search_path='' as $$
 begin
  if not public.adrio_is_admin() then raise insufficient_privilege; end if;
- return query select distinct on (h.r) h.r,h.v,h.t from (
-  select n.revision r,n.state v,n.updated_at t,1 priority from adrio_private.history n
-  union all select l.revision::bigint,l.state::jsonb,
-   coalesce(to_jsonb(l)->>'updated_at',to_jsonb(l)->>'created_at',to_jsonb(l)->>'saved_at',to_jsonb(l)->>'changed_at')::timestamptz,0 from public.schedule_history l
- ) h order by h.r desc,h.priority desc;
+ return query select h.revision,h.state,h.updated_at from public.schedule_history as h order by h.revision desc;
 end $$;
 revoke all on function adrio_private.valid(jsonb),public.adrio_is_admin(),public.adrio_publish(bigint,jsonb,boolean),public.adrio_history() from public,anon,authenticated;
 grant execute on function public.adrio_is_admin(),public.adrio_publish(bigint,jsonb,boolean),public.adrio_history() to authenticated;
