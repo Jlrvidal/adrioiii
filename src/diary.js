@@ -10,7 +10,7 @@ async function result(query) {
   if (error) throw error
   return data
 }
-export function diary(api, changed) {
+export function diary(api, changed, notes) {
   let entryId,
     rows = [],
     available = false,
@@ -98,19 +98,40 @@ export function diary(api, changed) {
     const filtered = rows.filter(
       (r) => !$('filter').value || r.phase === $('filter').value,
     )
-    for (const row of filtered) {
+    // Un único diario: observaciones y comentarios, del más reciente al más
+    // antiguo. Los comentarios no tienen fase y solo salen sin filtro.
+    const feed = [
+      ...filtered.map((row) => ({
+        row,
+        date: row.observed,
+        at: row.published_at,
+      })),
+      ...($('filter').value ? [] : (notes?.items() ?? [])).map((item) => ({
+        item,
+        date: item.posted_on,
+        at: item.created_at ?? '',
+      })),
+    ].sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) || String(b.at).localeCompare(a.at),
+    )
+    for (const { row, item } of feed) {
+      if (item) {
+        box.append(notes.node(item))
+        continue
+      }
       const article = el('article', '', 'entry')
       article.id = 'observacion-' + row.id
-      article.append(
+      const meta = el('div', '', 'entryMeta')
+      meta.append(
+        el('time', day(row.observed)),
         el(
-          'small',
-          day(row.observed) +
-            ' · ' +
-            (phases.find((p) => p[0] === row.phase)?.[1] || ''),
+          'span',
+          phases.find((p) => p[0] === row.phase)?.[1] || '',
+          'entryPhase',
         ),
-        el('h3', row.title),
-        el('p', row.body),
       )
+      article.append(meta, el('h3', row.title), el('p', row.body))
       if (row.photo) {
         const thumb = button('Ver fotografía', () => expand([row]))
         thumb.className = 'thumbnail'
@@ -154,15 +175,17 @@ export function diary(api, changed) {
       )
       box.append(article)
     }
-    if (!filtered.length)
+    // El filtro por fase solo tiene sentido si hay observaciones.
+    $('filter').closest('label').hidden = !rows.length && !$('filter').value
+    if (!feed.length)
       box.append(
         el(
           'p',
           !available
-            ? 'Las observaciones no están disponibles en este momento.'
+            ? 'El diario no está disponible en este momento.'
             : $('filter').value
-              ? 'Todavía no hay observaciones de esta fase.'
-              : 'Todavía no hay observaciones publicadas.',
+              ? 'Todavía no hay entradas de esta fase en el diario.'
+              : 'Todavía no hay entradas en el diario.',
           'empty',
         ),
       )
@@ -378,6 +401,7 @@ export function diary(api, changed) {
   window.addEventListener('adrio-photo-removed', refresh)
   return {
     refresh,
+    redraw: () => draw(),
     get rows() {
       return rows
     },

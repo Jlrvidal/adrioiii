@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=album2" />
+    <link rel="stylesheet" href="./style.css?v=orden1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=album2"></script>
-    <script type="module" src="./src/app.js?v=album2"></script>
+    <script defer src="./config.js?v=orden1"></script>
+    <script type="module" src="./src/app.js?v=orden1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -34,13 +34,13 @@
       content="https://twckvmhkdntuqpsiobnm.supabase.co"
     />
   </head>
-  <body>
+  <body class="coverVisible">
     <header>
       <div class="wrap top">
         <a class="brand" href="#portada">Adrio <em>III</em></a>
         <div class="navlinks">
-          <a href="#calendario">Calendario</a
-          ><a href="#diario">Diario de obra</a><a href="#album">Fotos</a>
+          <a href="#calendario">Calendario</a><a href="#album">Fotos</a
+          ><a href="#diario">Diario de obra</a>
         </div>
         <nav>
           <label
@@ -62,11 +62,6 @@
         <div class="covertext">
           <span class="kicker">Cuaderno de obra</span>
           <h1>Adrio <i>III</i></h1>
-          <p>
-            Cuatro plantas de viviendas, incluida la baja,<br />
-            y dos niveles de garaje.
-          </p>
-          <a class="albumShortcut" href="#album">Ir al álbum de obra ↓</a>
           <div class="coverstatus">
             <span id="status" role="status"></span><small id="stamp"></small>
           </div>
@@ -114,8 +109,7 @@
           <span class="toolhint"
             >Pulsa una fase o su barra para ver qué incluye.</span
           >
-          <button id="goToday">Ir a hoy</button
-          ><button id="chartAlbum" disabled>Fotos por día</button>
+          <button id="goToday">Ir a hoy</button>
         </div>
         <div class="scroll" tabindex="0" aria-label="Calendario desplazable">
           <div id="chart"></div>
@@ -215,107 +209,96 @@
           </ul>
         </details>
       </section>
-      <section id="diario" class="journal">
+      <section id="album" class="journal" aria-labelledby="albumTitle">
         <div class="sectionTitle">
-          <div>
-            <h2>Diario de obra</h2>
+          <h2 id="albumTitle">Fotos de la obra</h2>
+          <div
+            class="tabs albumView"
+            role="group"
+            aria-label="Ver las fotos por"
+          >
+            <button type="button" id="viewDay" aria-pressed="true">Día</button
+            ><button type="button" id="viewMonth" aria-pressed="false">
+              Mes</button
+            ><button type="button" id="viewPhase" aria-pressed="false">
+              Fase
+            </button>
           </div>
         </div>
-        <section id="album" aria-labelledby="albumTitle">
-          <div class="albumHead">
-            <h3 id="albumTitle">Fotos de la obra</h3>
-            <div
-              class="tabs albumView"
-              role="group"
-              aria-label="Ver las fotos por"
-            >
-              <button type="button" id="viewDay" aria-pressed="true">Día</button
-              ><button type="button" id="viewMonth" aria-pressed="false">
-                Mes</button
-              ><button type="button" id="viewPhase" aria-pressed="false">
-                Fase
-              </button>
-            </div>
+        <div class="albumBar">
+          <div class="albumNav">
+            <button id="olderDay" aria-label="Día anterior con fotos" disabled>
+              ←
+            </button>
+            <select id="albumDate" aria-label="Día del álbum"></select>
+            <button id="newerDay" aria-label="Día siguiente con fotos" disabled>
+              →
+            </button>
           </div>
-          <div class="albumBar">
-            <div class="albumNav">
-              <button
-                id="olderDay"
-                aria-label="Día anterior con fotos"
-                disabled
-              >
-                ←
-              </button>
-              <select id="albumDate" aria-label="Día del álbum"></select>
-              <button
-                id="newerDay"
-                aria-label="Día siguiente con fotos"
-                disabled
-              >
-                →
-              </button>
-            </div>
-            <small id="albumNote"></small>
-          </div>
-          <div id="dailyImages"></div>
-          <form id="photoUpload" aria-labelledby="shareTitle">
-            <div class="shareIntro">
-              <h4 id="shareTitle">Envía una foto de la obra</h4>
-              <p id="shareHelp">
-                Cualquiera puede enviar fotos. El administrador las revisa antes
-                de que aparezcan en el álbum.
-              </p>
-              <ol id="shareSteps" class="shareSteps">
-                <li>Eliges una foto</li>
-                <li>El administrador la revisa</li>
-                <li>Aparece en el álbum</li>
-              </ol>
-            </div>
-            <div class="sharePick">
-              <label class="dropzone" id="dropzone">
-                <input
-                  type="file"
-                  id="sharePhoto"
-                  class="srOnly"
-                  disabled
-                  accept="image/jpeg,image/png,image/webp"
-                />
-                <span id="dropEmpty" class="dropEmpty">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 8h3.5l1.8-2.5h5.4L16.5 8H20v11H4z" />
-                    <circle cx="12" cy="13.2" r="3.4" />
-                  </svg>
-                  <strong>Elige una foto</strong>
-                  <small
-                    ><span class="dragHint">o arrástrala aquí. </span>JPEG, PNG
-                    o WebP de hasta 12 MB.</small
-                  >
-                </span>
-                <span id="dropChosen" class="dropChosen" hidden>
-                  <img
-                    id="sharePreview"
-                    alt="Vista previa de la foto elegida"
-                  />
-                  <span>
-                    <strong id="shareName"></strong>
-                    <small>Pulsa aquí para elegir otra.</small>
-                  </span>
-                </span>
-              </label>
-              <div class="shareSend">
-                <button id="addDaily" disabled>Enviar para revisión</button>
-                <small id="photoQuota"></small>
-              </div>
-            </div>
-            <p id="uploadMessage" role="status"></p>
-            <p class="sharePrivacy">
-              Antes de enviarla, la foto se reduce de tamaño y se le quitan los
-              datos de ubicación y de la cámara.
+          <small id="albumNote"></small>
+        </div>
+        <div id="dailyImages"></div>
+        <form id="photoUpload" aria-labelledby="shareTitle">
+          <div class="shareIntro">
+            <h3 id="shareTitle">Envía una foto de la obra</h3>
+            <p id="shareHelp">
+              Cualquiera puede enviar fotos. El administrador las revisa antes
+              de que aparezcan en el álbum.
             </p>
-          </form>
-        </section>
-        <h3>Comentarios</h3>
-        <div id="commentsList"></div>
+            <ol id="shareSteps" class="shareSteps">
+              <li>Eliges una foto</li>
+              <li>El administrador la revisa</li>
+              <li>Aparece en el álbum</li>
+            </ol>
+          </div>
+          <div class="sharePick">
+            <label class="dropzone" id="dropzone">
+              <input
+                type="file"
+                id="sharePhoto"
+                class="srOnly"
+                disabled
+                accept="image/jpeg,image/png,image/webp"
+              />
+              <span id="dropEmpty" class="dropEmpty">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 8h3.5l1.8-2.5h5.4L16.5 8H20v11H4z" />
+                  <circle cx="12" cy="13.2" r="3.4" />
+                </svg>
+                <strong>Elige una foto</strong>
+                <small
+                  ><span class="dragHint">o arrástrala aquí. </span>JPEG, PNG o
+                  WebP de hasta 12 MB.</small
+                >
+              </span>
+              <span id="dropChosen" class="dropChosen" hidden>
+                <img id="sharePreview" alt="Vista previa de la foto elegida" />
+                <span>
+                  <strong id="shareName"></strong>
+                  <small>Pulsa aquí para elegir otra.</small>
+                </span>
+              </span>
+            </label>
+            <div class="shareSend">
+              <button id="addDaily" disabled>Enviar para revisión</button>
+              <small id="photoQuota"></small>
+            </div>
+          </div>
+          <p id="uploadMessage" role="status"></p>
+          <p class="sharePrivacy">
+            Antes de enviarla, la foto se reduce de tamaño y se le quitan los
+            datos de ubicación y de la cámara.
+          </p>
+        </form>
+      </section>
+      <section id="diario" class="journal">
+        <div class="sectionTitle">
+          <h2>Diario de obra</h2>
+          <label class="diaryFilter"
+            >Fase
+            <select id="filter"></select
+          ></label>
+        </div>
         <form id="commentForm" hidden>
           <label>Fecha<input id="commentDate" type="date" required /></label>
           <label
@@ -328,13 +311,6 @@
           <button id="postComment">Publicar comentario</button>
         </form>
         <p id="commentMessage" role="status"></p>
-        <div class="albumHead">
-          <h3>Observaciones por fase</h3>
-          <label
-            >Fase
-            <select id="filter"></select
-          ></label>
-        </div>
         <div id="entries"></div>
         <div id="comparePhotos"></div>
       </section>
@@ -424,11 +400,6 @@
     </dialog>
     <dialog id="phaseDialog">
       <div id="phaseBody"></div>
-      <form method="dialog"><button>Cerrar</button></form>
-    </dialog>
-    <dialog id="albumPicker">
-      <h2>Elegir día de obra</h2>
-      <div id="monthDays"></div>
       <form method="dialog"><button>Cerrar</button></form>
     </dialog>
     <dialog id="photoDialog">

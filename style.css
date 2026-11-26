@@ -485,11 +485,6 @@ nav button {
   font-weight: 400;
   color: #d4e4bc;
 }
-.cover p {
-  color: #e5e8db;
-  font-size: 15px;
-  line-height: 1.45;
-}
 .coverstatus {
   display: flex;
   gap: 8px;
@@ -981,9 +976,6 @@ footer {
   nav {
     gap: 4px;
   }
-  .covertext br {
-    display: none;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -1040,9 +1032,6 @@ footer {
   .top nav button {
     font-size: 11px;
     padding: 5px 7px;
-  }
-  .covertext br {
-    display: inline;
   }
   .covertext .kicker {
     letter-spacing: 0.075em;
@@ -1118,7 +1107,6 @@ footer {
 .cover h1 i {
   color: var(--accent);
 }
-.cover p,
 .coverstatus #stamp {
   color: var(--muted);
 }
@@ -1155,9 +1143,6 @@ footer {
 }
 #album {
   scroll-margin-top: 1rem;
-  border-bottom: 1px solid var(--line);
-  padding: 0 0 1.5rem;
-  margin: 0.5rem 0 1.5rem;
 }
 .albumHead,
 .albumNav {
@@ -1177,10 +1162,6 @@ footer {
 #addDaily,
 #postComment {
   min-height: 42px;
-}
-.siteComment time {
-  color: var(--muted);
-  font-size: 0.83rem;
 }
 #commentForm label {
   display: grid;
@@ -1220,13 +1201,6 @@ footer {
   background: var(--tint);
   border: 1px solid var(--accent);
 }
-#monthDays {
-  display: grid;
-  gap: 0.35rem;
-  padding: 1rem 0;
-  max-height: 55vh;
-  overflow: auto;
-}
 #commentForm:not([hidden]) {
   display: grid;
   gap: 0.75rem;
@@ -1238,24 +1212,6 @@ footer {
 }
 #commentForm textarea {
   min-height: 5rem;
-}
-.siteComment {
-  display: flex;
-  gap: 1rem;
-  align-items: baseline;
-  border-bottom: 1px solid var(--line);
-  padding: 0.75rem 0;
-  flex-wrap: wrap;
-}
-.siteComment p {
-  flex: 1;
-  min-width: min(220px, 100%);
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-#commentsList {
-  margin: 1rem 0 2rem;
 }
 @media (prefers-reduced-motion: no-preference) {
   #dailyImages img,
@@ -1302,13 +1258,6 @@ footer {
   }
 }
 
-.albumShortcut {
-  display: inline-block;
-  color: var(--accent);
-  text-underline-offset: 3px;
-  font-size: 0.9rem;
-  padding: 0.3rem 0;
-}
 @media (max-width: 600px) {
   .coverstatus {
     width: 100%;
@@ -1576,9 +1525,6 @@ footer {
 .journal > h3 {
   margin-top: 0;
 }
-.journal > .albumHead {
-  margin-top: 2rem;
-}
 footer {
   align-items: center;
 }
@@ -1713,7 +1659,7 @@ footer #notice:empty {
   background: var(--tint);
   border-radius: var(--radius);
 }
-.shareIntro h4 {
+.shareIntro h3 {
   font: normal 21px/1.2 var(--display);
   margin: 0 0 4px;
 }
@@ -1925,14 +1871,14 @@ footer #notice:empty {
 .photoGroup + .photoGroup {
   margin-top: 22px;
 }
-.photoGroup h4 {
+.photoGroup h3 {
   display: flex;
   align-items: baseline;
   gap: 10px;
   margin: 0 0 8px;
   font: normal 17px/1.3 var(--display);
 }
-.photoGroup h4 small {
+.photoGroup h3 small {
   font:
     12px system-ui,
     sans-serif;
@@ -1963,4 +1909,128 @@ footer #notice:empty {
 }
 #phaseBody .phasePhotos {
   margin: 4px 0 6px;
+}
+
+/* Diario: observaciones y comentarios en una sola lista por fechas */
+.diaryFilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+#entries {
+  display: block;
+  border-top: 1px solid var(--line);
+}
+#entries .entry,
+#entries .siteComment {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  column-gap: 28px;
+  row-gap: 6px;
+  align-content: start;
+  margin: 0;
+  padding: 18px 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+#entries .entry > *,
+#entries .siteComment > * {
+  grid-column: 2;
+  margin: 0;
+}
+#entries .entryMeta {
+  grid-column: 1;
+  grid-row: 1 / span 12;
+  display: grid;
+  align-content: start;
+  gap: 3px;
+}
+#entries .entryMeta time {
+  font-weight: 650;
+  font-size: 14px;
+}
+.entryPhase {
+  font-size: 12px;
+  color: var(--accent);
+}
+#entries .entry h3 {
+  font-size: 20px;
+}
+#entries .siteComment p,
+#entries .entry p {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  max-width: 70ch;
+}
+#entries .thumbnail {
+  grid-row: auto;
+  max-width: 420px;
+  margin-top: 6px;
+}
+#entries .entry > small {
+  color: var(--muted);
+  font-size: 12px;
+}
+#entries .entry > button:not(.thumbnail),
+#entries .siteComment > button {
+  justify-self: start;
+  min-height: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+#commentForm:not([hidden]) {
+  background: var(--tint);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+@media (max-width: 600px) {
+  #entries .entry,
+  #entries .siteComment {
+    grid-template-columns: 1fr;
+  }
+  #entries .entryMeta {
+    grid-row: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    align-items: baseline;
+  }
+}
+
+/* Cabecera fija; el nombre se oculta mientras se ve la portada */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand {
+  transition: opacity 0.2s;
+}
+.coverVisible .brand {
+  opacity: 0;
+  pointer-events: none;
+}
+main section[id] {
+  scroll-margin-top: 76px;
+}
+#album {
+  scroll-margin-top: 76px;
+}
+#album.noPhotos .albumBar,
+#album.noPhotos .albumView {
+  display: none;
+}
+#entries:has(> .empty) {
+  border-top: 0;
+}
+.diaryFilter[hidden] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand {
+    transition: none;
+  }
 }
