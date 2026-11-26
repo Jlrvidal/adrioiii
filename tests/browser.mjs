@@ -310,8 +310,9 @@ try {
       )
     }
     if (width === 390) {
-      await page.locator('#phaseList').scrollIntoViewIfNeeded()
-      await shot('mobile-phases')
+      assert.ok(await page.locator('#chart .bar').first().isVisible())
+      await page.locator('#chart').scrollIntoViewIfNeeded()
+      await shot('mobile-calendar')
     }
   }
   await page.setViewportSize({ width: 1440, height: 900 })
@@ -320,6 +321,15 @@ try {
   await page.locator('#realista').click()
   await page.locator('#chart').scrollIntoViewIfNeeded()
   await shot('realista')
+  assert.equal(
+    await page
+      .locator('#gantt,#vertical,#phaseList,#expected,details.method')
+      .count(),
+    0,
+  )
+  assert.equal(await page.locator('.readGuide li').count(), 8)
+  await page.locator('.readGuide').scrollIntoViewIfNeeded()
+  await shot('read-guide')
   await page.locator('#comparar').click()
   assert.equal(await page.locator('.secondBar').count(), 7)
   assert.equal(
@@ -335,6 +345,13 @@ try {
   await shot('gantt')
   await page.locator('#chart button.caption').first().click()
   await page.locator('#phaseDialog[open]').waitFor()
+  for (const title of [
+    'Qué se suele hacer',
+    'Qué puede acelerarla',
+    'Qué puede retrasarla',
+  ])
+    await page.locator('#phaseBody h3', { hasText: title }).waitFor()
+  await shot('phase-detail')
   await page.locator('#phaseDialog button').click()
   await page.locator('#diario').scrollIntoViewIfNeeded()
   for (let i = 0; i < 2; i++) {

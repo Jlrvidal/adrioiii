@@ -24,7 +24,6 @@ const requestedScenario = new URL(location.href).searchParams.get('escenario')
 let mode = requestedScenario === 'optimista' ? 'optimista' : 'pesimista'
 let visitorPreview = false,
   compare = requestedScenario === 'comparar',
-  listView = matchMedia('(max-width:640px)').matches,
   gallery,
   moderator,
   notes,
@@ -204,13 +203,7 @@ function render() {
       dateStyle: 'long',
       timeZone: 'Europe/Madrid',
     })
-  $('gantt').setAttribute('aria-pressed', String(!listView))
-  $('vertical').setAttribute('aria-pressed', String(listView))
-  document.querySelector('.scroll').hidden = listView
-  $('phaseList').hidden = !listView
-  $('goToday').hidden = listView
-  $('yearKey').hidden = listView
-  $('compareKey').hidden = !compare || listView
+  $('compareKey').hidden = !compare
   if (
     lastState !== state ||
     lastMode !== mode ||
@@ -224,7 +217,6 @@ function render() {
       now,
       Boolean(store?.stamp),
       book?.rows ?? [],
-      compare,
     )
     renderChart($('chart'), state, mode, now, enabled && !compare, {
       photoDays: gallery?.dates() ?? [],
@@ -263,14 +255,6 @@ $('returnEdit').onclick = () => {
   extraVersion++
   render()
   $('admin').scrollIntoView()
-}
-$('gantt').onclick = () => {
-  listView = false
-  render()
-}
-$('vertical').onclick = () => {
-  listView = true
-  render()
 }
 $('goToday').onclick = () => {
   const pane = document.querySelector('.scroll'),
