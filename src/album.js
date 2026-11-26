@@ -60,31 +60,36 @@ export function album(db, changed) {
     const daily = rows.filter((r) => r.taken === date)
     const frame = $('dailyImages')
     frame.replaceChildren()
+    // El mosaico cambia según haya 1, 2 o 3 fotos ese día.
+    frame.dataset.count = daily.length
     if (!daily.length)
       frame.append(
         el(
           'p',
           available
-            ? 'El álbum empieza con la primera foto de obra.'
-            : 'El álbum está temporalmente fuera de servicio.',
+            ? 'Todavía no hay fotos en el álbum. Puedes enviar la primera aquí debajo.'
+            : 'El álbum no está disponible en este momento.',
           'empty',
         ),
       )
-    for (const row of daily) {
+    daily.forEach((row, n) => {
       const figure = el('figure'),
-        button = el('button'),
+        button = el('button', '', 'photoOpen'),
         img = el('img')
-      img.alt = 'Foto ' + row.slot + ' del ' + day(date)
-      button.title = 'Ampliar ' + img.alt.toLowerCase()
+      img.alt = 'Foto ' + (n + 1) + ' de ' + daily.length + ' del ' + day(date)
+      button.type = 'button'
+      button.title = 'Ampliar la foto'
       button.onclick = () => {
         const big = img.cloneNode()
         $('photoBody').replaceChildren(big, el('p', img.alt))
         $('photoDialog').showModal()
       }
       button.append(img)
-      figure.append(button, el('figcaption', 'Foto ' + row.slot))
+      figure.append(button)
       if (admin) {
         const remove = el('button', 'Eliminar', 'removePhoto')
+        remove.type = 'button'
+        remove.setAttribute('aria-label', 'Eliminar ' + img.alt.toLowerCase())
         remove.onclick = async () => {
           if (!admin || !confirm('¿Eliminar esta foto del álbum?')) return
           remove.disabled = true
@@ -92,9 +97,7 @@ export function album(db, changed) {
             taken_on: row.taken,
             position_in_day: row.slot,
           })
-          $('uploadMessage').textContent = error
-            ? error.message
-            : 'Foto eliminada.'
+          say(error ? error.message : 'Foto eliminada.', error ? 'error' : 'ok')
           if (error) remove.disabled = false
           else {
             sources.delete(cacheKey(row))
@@ -109,9 +112,12 @@ export function album(db, changed) {
         (src) => {
           img.src = src
         },
-        () => button.replaceWith(el('span', 'No se pudo cargar la foto.')),
+        () =>
+          button.replaceWith(
+            el('span', 'No se ha podido cargar esta foto.', 'photoMissing'),
+          ),
       )
-    }
+    })
     const days = dates(),
       idx = days.indexOf(date)
     $('olderDay').disabled = idx < 0 || idx === days.length - 1
@@ -124,11 +130,21 @@ export function album(db, changed) {
       count = rows.filter((r) => r.taken === today).length
     $('photoQuota').textContent = available
       ? count === 3
-        ? 'Álbum de hoy completo · 3 de 3'
-        : count + ' de 3 fotos hoy · hora de Madrid'
-      : 'Subida de fotos temporalmente fuera de servicio.'
-    $('sharePhoto').disabled = busy || !available || count >= 3
-    $('addDaily').disabled = $('sharePhoto').disabled
+        ? 'El álbum de hoy ya está completo (3 de 3). Podrás enviar otra foto mañana.'
+        : count + ' de 3 fotos publicadas hoy.'
+      : 'El envío de fotos no está disponible en este momento.'
+    const closed = busy || !available || count >= 3
+    $('sharePhoto').disabled = closed
+    $('photoUpload').classList.toggle('closed', !available || count >= 3)
+    $('addDaily').disabled = closed || !$('sharePhoto').files.length
+    $('addDaily').textContent = admin ? 'Publicar foto' : 'Enviar para revisión'
+    $('shareTitle').textContent = admin
+      ? 'Publica una foto de la obra'
+      : 'Envía una foto de la obra'
+    $('shareHelp').textContent = admin
+      ? 'Como administrador, tus fotos se publican al momento, sin revisión.'
+      : 'Cualquiera puede enviar fotos. El administrador las revisa antes de que aparezcan en el álbum.'
+    $('shareSteps').hidden = admin
     $('chartAlbum').disabled = !days.length
     const signature = JSON.stringify([rows, available, admin])
     if (shown === signature) return
@@ -211,9 +227,43 @@ export function album(db, changed) {
   $('olderDay').onclick = () => choose(dates()[dates().indexOf(selected) + 1])
   $('newerDay').onclick = () => choose(dates()[dates().indexOf(selected) - 1])
   $('chartAlbum').onclick = () => openMonth()
+  function say(text, kind = '') {
+    $('uploadMessage').textContent = text
+    $('uploadMessage').className = kind
+  }
+  let previewURL = ''
+  // Muestra la foto elegida dentro de la zona de selección antes de enviarla.
+  function showChosen(file) {
+    if (previewURL) URL.revokeObjectURL(previewURL)
+    previewURL = file ? URL.createObjectURL(file) : ''
+    $('sharePreview').src = previewURL
+    $('shareName').textContent = file ? file.name : ''
+    $('dropEmpty').hidden = Boolean(file)
+    $('dropChosen').hidden = !file
+    draw()
+  }
+  $('sharePreview').onerror = () => {
+    if ($('sharePreview').getAttribute('src'))
+      $('sharePreview').removeAttribute('src')
+  }
   $('sharePhoto').onchange = () => {
     retry = null
-    $('uploadMessage').textContent = ''
+    say('')
+    showChosen($('sharePhoto').files[0])
+  }
+  const zone = $('dropzone')
+  zone.ondragenter = zone.ondragover = (e) => {
+    if ($('sharePhoto').disabled) return
+    e.preventDefault()
+    zone.classList.add('over')
+  }
+  zone.ondragleave = () => zone.classList.remove('over')
+  zone.ondrop = (e) => {
+    zone.classList.remove('over')
+    if ($('sharePhoto').disabled || !e.dataTransfer?.files.length) return
+    e.preventDefault()
+    $('sharePhoto').files = e.dataTransfer.files
+    $('sharePhoto').dispatchEvent(new Event('change'))
   }
   $('photoUpload').onsubmit = async (e) => {
     e.preventDefault()
@@ -223,19 +273,22 @@ export function album(db, changed) {
     draw()
     try {
       retry ??= { id: crypto.randomUUID() }
-      $('uploadMessage').textContent = 'Preparando la foto…'
+      say('Preparando la foto…')
       retry.blob ??= await optimize(file)
-      $('uploadMessage').textContent = 'Enviando…'
+      say('Enviando…')
       const path = await addPhoto(db, retry.blob, retry.id)
       if (path !== 'pendiente') selected = path.slice(0, 10)
       retry = null
       $('photoUpload').reset()
-      $('uploadMessage').textContent =
-        path === 'pendiente'
-          ? 'Foto enviada. Se publicará cuando la revise el administrador.'
-          : 'Foto publicada en el álbum del ' + day(selected) + '.'
+      showChosen(null)
+      if (path === 'pendiente')
+        say(
+          'Foto enviada. Se publicará cuando la revise el administrador.',
+          'ok',
+        )
+      else say('Foto publicada en el álbum del ' + day(selected) + '.', 'ok')
     } catch (err) {
-      $('uploadMessage').textContent = err.message
+      say(err.message, 'error')
     } finally {
       busy = false
       await refresh()
