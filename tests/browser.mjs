@@ -323,10 +323,11 @@ try {
   await shot('realista')
   assert.equal(
     await page
-      .locator('#gantt,#vertical,#phaseList,#expected,details.method')
+      .locator('#gantt,#vertical,#phaseList,#expected,details.method,#journey')
       .count(),
     0,
   )
+  assert.equal(await page.locator('#countBar i').count(), 7)
   assert.equal(await page.locator('.readGuide li').count(), 8)
   await page.locator('.readGuide').scrollIntoViewIfNeeded()
   await shot('read-guide')

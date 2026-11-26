@@ -13,6 +13,10 @@ export function overview(state, mode, now, known, entries) {
   const plan = state.plans[mode],
     actual = state.completed.filter(Boolean).length
   $('count').textContent = known ? actual + ' de 7' : 'Sin datos'
+  // Una marca por fase, rellena cuando su hito está confirmado.
+  $('countBar').replaceChildren(
+    ...state.completed.map((done) => el('i', '', done && known ? 'on' : '')),
+  )
   for (const [scenario, id] of [
     ['pesimista', 'late'],
     ['optimista', 'early'],
@@ -78,14 +82,5 @@ export function overview(state, mode, now, known, entries) {
     // showModal enfoca «Cerrar», al final: volver al principio de la explicación.
     $('phaseDialog').scrollTop = 0
   }
-  const journey = $('journey')
-  journey.replaceChildren()
-  plan.forEach((p, i) => {
-    const b = el('button')
-    b.append(icon(i), el('strong', descriptions[i][1]))
-    if (state.completed[i]) b.append(el('small', 'Hito confirmado'))
-    b.onclick = () => detail(i)
-    journey.append(b)
-  })
   return detail
 }
