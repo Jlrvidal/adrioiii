@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=fotos1" />
+    <link rel="stylesheet" href="./style.css?v=album2" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=fotos1"></script>
-    <script type="module" src="./src/app.js?v=fotos1"></script>
+    <script defer src="./config.js?v=album2"></script>
+    <script type="module" src="./src/app.js?v=album2"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -224,6 +224,20 @@
         <section id="album" aria-labelledby="albumTitle">
           <div class="albumHead">
             <h3 id="albumTitle">Fotos de la obra</h3>
+            <div
+              class="tabs albumView"
+              role="group"
+              aria-label="Ver las fotos por"
+            >
+              <button type="button" id="viewDay" aria-pressed="true">Día</button
+              ><button type="button" id="viewMonth" aria-pressed="false">
+                Mes</button
+              ><button type="button" id="viewPhase" aria-pressed="false">
+                Fase
+              </button>
+            </div>
+          </div>
+          <div class="albumBar">
             <div class="albumNav">
               <button
                 id="olderDay"
@@ -241,6 +255,7 @@
                 →
               </button>
             </div>
+            <small id="albumNote"></small>
           </div>
           <div id="dailyImages"></div>
           <form id="photoUpload" aria-labelledby="shareTitle">

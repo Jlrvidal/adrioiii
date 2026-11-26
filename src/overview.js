@@ -9,7 +9,7 @@ function list(title, items, cls) {
   box.append(el('h3', title), ul)
   return box
 }
-export function overview(state, mode, now, known, entries) {
+export function overview(state, mode, now, known, entries, photos) {
   const plan = state.plans[mode],
     actual = state.completed.filter(Boolean).length
   $('count').textContent = known ? actual + ' de 7' : 'Sin datos'
@@ -63,6 +63,21 @@ export function overview(state, mode, now, known, entries) {
         'phaseNote',
       ),
     )
+    // Enlace al álbum filtrado por esta fase, si tiene fotos.
+    const shots = photos?.phaseCount(i) ?? 0
+    if (shots) {
+      const go = el(
+        'button',
+        'Ver las fotos de esta fase (' + shots + ')',
+        'phasePhotos',
+      )
+      go.type = 'button'
+      go.onclick = () => {
+        $('phaseDialog').close()
+        photos.showPhase(i)
+      }
+      box.querySelector('.phaseWhen').after(go)
+    }
     const notes = entries.filter((r) => r.phase === p.id)
     if (notes.length) {
       box.append(el('h3', 'Observaciones de obra'))
