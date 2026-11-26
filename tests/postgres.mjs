@@ -367,7 +367,119 @@ assert.equal(
   ).slot,
   1,
 )
+// 005: pg_net y Vault no existen en pglite; se sustituyen por tablas que
+// registran lo que se habría enviado.
+await db.exec(`reset role;
+create schema net;
+create table net.sent(url text, headers jsonb, body jsonb);
+create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
+  headers jsonb default '{}', timeout_milliseconds int default 1000) returns bigint
+language sql as $$ insert into net.sent values (url, headers, body); select 1::bigint $$;
+create schema vault;
+create table vault.decrypted_secrets(name text, decrypted_secret text);`)
+await db.exec(
+  await readFile(
+    new URL('../migrations/005_notify_and_dated_photos.sql', import.meta.url),
+    'utf8',
+  ),
+)
+const sent = async () => (await db.query('select * from net.sent')).rows
+// Sin secretos no se envía nada, pero la foto entra en la cola.
+await admin()
+await remove(2)
+await remove(3)
+await rpc('reject_photo', (await pending())[0].id)
+await anon()
+assert.equal((await newUpload()).rows[0].path, 'pendiente')
+await db.exec('reset role')
+assert.equal((await sent()).length, 0)
+await db.exec(`insert into vault.decrypted_secrets values
+  ('adrio_resend_key','re_test'),('adrio_notify_to','admin@example.com')`)
+await admin()
+await rpc('reject_photo', (await pending())[0].id)
+await anon()
+assert.equal((await newUpload()).rows[0].path, 'pendiente')
+await db.exec('reset role')
+const [mail] = await sent()
+const newest = (
+  await db.query(
+    'select id from adrio_private.photo_queue order by created_at desc, id limit 1',
+  )
+).rows[0].id
+assert.equal(mail.url, 'https://api.resend.com/emails')
+assert.equal(mail.headers.Authorization, 'Bearer re_test')
+assert.deepEqual(mail.body.to, ['admin@example.com'])
+assert.equal(mail.body.from, 'Adrio III <onboarding@resend.dev>')
+assert.ok(
+  mail.body.html.includes(
+    'https://jlrvidal.github.io/adrioiii/?revisar=' + newest,
+  ),
+)
+assert.equal(mail.body.attachments[0].content, jpeg.toString('base64'))
+// Si el envío falla, la foto sigue entrando en la cola.
+await db.exec(`create or replace function net.http_post(url text, body jsonb default '{}',
+  params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 1000)
+returns bigint language plpgsql as $$ begin raise exception 'sin red'; end $$`)
+await admin()
+await rpc('reject_photo', (await pending())[0].id)
+await anon()
+assert.equal((await newUpload()).rows[0].path, 'pendiente')
+// Fotos del administrador con fecha.
+const addOn = (id, day, bytes = jpeg) =>
+  db.query('select public.adrio_add_photo_on($1,$2,$3::date) as path', [
+    id,
+    bytes.toString('base64'),
+    day,
+  ])
+for (const role of ['anon', 'authenticated']) {
+  await db.exec('reset role; set role ' + role)
+  if (role === 'authenticated')
+    await db.exec(
+      "set request.jwt.claim.sub='00000000-0000-4000-a000-000000000001'",
+    )
+  await assert.rejects(addOn(crypto.randomUUID(), '2025-03-04'), {
+    code: '42501',
+  })
+}
+await admin()
+await assert.rejects(addOn(crypto.randomUUID(), '2019-12-31'), /entre/)
+await assert.rejects(addOn(crypto.randomUUID(), '2999-01-01'), /entre/)
+await assert.rejects(
+  addOn(crypto.randomUUID(), '2025-03-04', Buffer.from('invalid')),
+  /válida/,
+)
+const dated = crypto.randomUUID()
+assert.equal(
+  (await addOn(dated, '2025-03-04')).rows[0].path,
+  '2025-03-04/1.jpg',
+)
+assert.equal(
+  (await addOn(dated, '2025-03-04')).rows[0].path,
+  '2025-03-04/1.jpg',
+)
+assert.equal(
+  (await addOn(crypto.randomUUID(), '2025-03-04')).rows[0].path,
+  '2025-03-04/2.jpg',
+)
+assert.equal(
+  (await addOn(crypto.randomUUID(), '2025-03-04')).rows[0].path,
+  '2025-03-04/3.jpg',
+)
+await assert.rejects(addOn(crypto.randomUUID(), '2025-03-04'), /tres fotos/)
+assert.equal(
+  (await addOn(crypto.randomUUID(), '2021-07-15')).rows[0].path,
+  '2021-07-15/1.jpg',
+)
+assert.equal(
+  (
+    await db.query(
+      "select count(*)::int as n from public.adrio_photo_index() where taken='2025-03-04'",
+    )
+  ).rows[0].n,
+  3,
+)
+await db.exec('reset role')
 await db.close()
 console.log(
-  'Four migrations passed, including photo moderation, permissions and queue limits.',
+  'Five migrations passed, including photo moderation, email notices, dated admin photos, permissions and queue limits.',
 )

@@ -323,6 +323,8 @@ gallery = album(
   () => store?.published ?? fallback,
 )
 moderator = moderation(api?.db, gallery.refresh)
+const review = new URLSearchParams(location.search).get('revisar')
+if (/^[0-9a-f-]{36}$/i.test(review || '')) moderator.focus(review)
 async function extras() {
   if (extraLoading || document.hidden || store?.editing || viewingEdit()) return
   extraLoading = true
@@ -378,6 +380,12 @@ if (api) {
     if (!uid) visitorPreview = false
     checkedUser = uid
     render()
+    // Enlace de un aviso por correo sin sesión: pedir acceso directamente.
+    if (event === 'INITIAL_SESSION' && !uid && moderator.waiting()) {
+      $('login').click()
+      $('autherror').textContent =
+        'Inicia sesión para revisar la foto pendiente del aviso.'
+    }
     if (uid) setTimeout(() => verifyOwner(seq), 0)
     else if (event === 'SIGNED_OUT') store.refresh()
   })

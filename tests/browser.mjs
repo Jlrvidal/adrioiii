@@ -153,6 +153,11 @@ try {
       })
       return send('pendiente')
     }
+    if (path === '/rest/v1/rpc/adrio_add_photo_on') {
+      if (!signedIn || uid !== owner) return send({ code: '42501' }, 403)
+      const { taken_on, image_base64 } = req.postDataJSON()
+      return publishPhoto(taken_on, image_base64)
+    }
     if (path === '/rest/v1/rpc/adrio_pending_photos')
       return send(
         pendingPhotos.map(({ id, submitted_on, created_at }) => ({
@@ -434,7 +439,14 @@ try {
     await page.locator('#password').fill(password)
     await page.locator('#enter').click()
   }
-  await page.locator('#login').click()
+  // Enlace del aviso por correo: pide acceso y después señala la foto.
+  const reviewTarget = pendingPhotos[1].id
+  await page.goto(url + '?revisar=' + reviewTarget)
+  await page.locator('#auth[open]').waitFor()
+  assert.match(
+    await page.locator('#autherror').textContent(),
+    /revisar la foto pendiente/,
+  )
   await login('incorrecta')
   await page.getByText('Correo o contraseña incorrectos.').waitFor()
   uid = '00000000-0000-4000-a000-000000000001'
@@ -446,6 +458,14 @@ try {
   uid = owner
   await login('fixture')
   await page.locator('.handle').first().waitFor()
+  await page.locator('#pendingPhotos article.reviewFocus').waitFor()
+  assert.equal(
+    await page
+      .locator('#pendingPhotos article.reviewFocus')
+      .getAttribute('data-id'),
+    reviewTarget,
+  )
+  assert.ok(!page.url().includes('revisar'))
   await page.reload()
   await page.locator('.handle').first().waitFor()
   await page.locator('#admin').scrollIntoViewIfNeeded()
@@ -569,17 +589,57 @@ try {
     .click()
   await page.locator('.entry').waitFor({ state: 'detached' })
   assert.equal(diaryWrites, 3)
+  const today = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Madrid',
+  }).format(new Date())
+  const fixture = await readFile(new URL('fixtures/album.jpg', import.meta.url))
   await page.locator('#sharePhoto').setInputFiles({
     name: 'tercera.jpg',
     mimeType: 'image/jpeg',
-    buffer: await readFile(new URL('fixtures/album.jpg', import.meta.url)),
+    buffer: fixture,
   })
-  await page.locator('#addDaily').click()
-  await page.locator('#photoQuota').filter({ hasText: 'completo' }).waitFor()
-  assert.equal(await page.locator('#dailyImages figure').count(), 3)
+  await page.locator('#shareBatch li').waitFor()
+  await page.locator('#shareBatch input[type=date]').fill(today)
   assert.equal(await page.locator('#addDaily').textContent(), 'Publicar foto')
+  await page.locator('#addDaily').click()
+  await page.getByText('Foto publicada en el álbum').waitFor()
+  assert.equal(await page.locator('#dailyImages figure').count(), 3)
   assert.equal(await page.locator('#shareSteps').isVisible(), false)
+  assert.equal(await page.locator('#shareBatch').isVisible(), false)
   assert.equal(await page.locator('#addDaily').isDisabled(), true)
+  // Hoy está completo, pero el administrador puede publicar en otros días.
+  assert.equal(await page.locator('#sharePhoto').isDisabled(), false)
+  await page.locator('#sharePhoto').setInputFiles([
+    { name: 'antigua.jpg', mimeType: 'image/jpeg', buffer: fixture },
+    { name: 'otra.jpg', mimeType: 'image/jpeg', buffer: fixture },
+  ])
+  await page.waitForFunction(
+    () => document.querySelectorAll('#shareBatch li').length === 2,
+  )
+  const dates = page.locator('#shareBatch input[type=date]')
+  await dates.nth(0).fill(today)
+  await page
+    .locator('#shareBatch .batchHint')
+    .first()
+    .filter({ hasText: 'ya tiene 3 fotos' })
+    .waitFor()
+  await dates.nth(0).fill('2021-07-15')
+  await dates.nth(1).fill('2025-03-04')
+  assert.equal(
+    await page.locator('#addDaily').textContent(),
+    'Publicar 2 fotos',
+  )
+  await page.locator('#photoUpload').scrollIntoViewIfNeeded()
+  await shot('admin-batch')
+  await page.locator('#addDaily').click()
+  await page.getByText('Publicadas 2 fotos.').waitFor()
+  assert.ok(dailyPhotos.some((r) => r.taken === '2021-07-15'))
+  assert.ok(dailyPhotos.some((r) => r.taken === '2025-03-04'))
+  assert.equal(await page.locator('#albumDate').inputValue(), '2025-03-04')
+  dailyPhotos = dailyPhotos.filter(
+    (r) => r.taken !== '2021-07-15' && r.taken !== '2025-03-04',
+  )
+  await page.reload()
   page.once('dialog', (dialog) => dialog.accept())
   await page.locator('#dailyImages .removePhoto').last().click()
   await page.getByText('Foto eliminada.').waitFor()
@@ -589,10 +649,14 @@ try {
   await page.locator('#sharePhoto').setInputFiles({
     name: 'reemplazo.jpg',
     mimeType: 'image/jpeg',
-    buffer: await readFile(new URL('fixtures/album.jpg', import.meta.url)),
+    buffer: fixture,
   })
+  await page.locator('#shareBatch input[type=date]').fill(today)
   await page.locator('#addDaily').click()
-  await page.locator('#photoQuota').filter({ hasText: 'completo' }).waitFor()
+  await page.getByText('Foto publicada en el álbum').waitFor()
+  await page.waitForFunction(
+    () => document.querySelectorAll('#dailyImages figure').length === 3,
+  )
   const prior = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   dailyPhotos.push({ taken: prior, slot: 1, legacy: null })
   await page.reload()

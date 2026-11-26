@@ -8,6 +8,8 @@ export function moderation(db, published) {
   const status = document.getElementById('moderationStatus')
   let admin = false
   let generation = 0
+  // Foto que llega desde el enlace del correo (?revisar=<id>).
+  let target = null
 
   async function refresh() {
     if (!admin) return
@@ -22,6 +24,7 @@ export function moderation(db, published) {
     if (!data.length) list.textContent = 'No hay fotos pendientes.'
     for (const row of data) {
       const entry = element('article')
+      entry.dataset.id = row.id
       const image = element('img')
       const approve = element('button', 'Aprobar')
       const reject = element('button', 'Rechazar')
@@ -58,10 +61,31 @@ export function moderation(db, published) {
       approve.onclick = () => decide('approve')
       reject.onclick = () => decide('reject')
     }
+    if (target) {
+      const entry = [...list.children].find((e) => e.dataset.id === target)
+      target = null
+      const url = new URL(location.href)
+      url.searchParams.delete('revisar')
+      history.replaceState(null, '', url)
+      if (entry) {
+        entry.classList.add('reviewFocus')
+        status.textContent = 'Esta es la foto del aviso.'
+        entry.scrollIntoView({ block: 'center' })
+      } else {
+        status.textContent = 'La foto del aviso ya se ha revisado.'
+        panel.scrollIntoView({ block: 'start' })
+      }
+    }
   }
 
   return {
     refresh,
+    // El enlace del correo apunta a una foto concreta de la cola.
+    focus(id) {
+      target = id
+      if (admin) refresh()
+    },
+    waiting: () => Boolean(target),
     setAdmin(value) {
       if (admin === value) return
       admin = value

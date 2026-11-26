@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=orden1" />
+    <link rel="stylesheet" href="./style.css?v=avisos1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=orden1"></script>
-    <script type="module" src="./src/app.js?v=orden1"></script>
+    <script defer src="./config.js?v=avisos1"></script>
+    <script type="module" src="./src/app.js?v=avisos1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -265,7 +265,7 @@
                   <path d="M4 8h3.5l1.8-2.5h5.4L16.5 8H20v11H4z" />
                   <circle cx="12" cy="13.2" r="3.4" />
                 </svg>
-                <strong>Elige una foto</strong>
+                <strong id="dropTitle">Elige una foto</strong>
                 <small
                   ><span class="dragHint">o arrástrala aquí. </span>JPEG, PNG o
                   WebP de hasta 12 MB.</small
@@ -284,6 +284,7 @@
               <small id="photoQuota"></small>
             </div>
           </div>
+          <ul id="shareBatch" class="shareBatch" hidden></ul>
           <p id="uploadMessage" role="status"></p>
           <p class="sharePrivacy">
             Antes de enviarla, la foto se reduce de tamaño y se le quitan los
