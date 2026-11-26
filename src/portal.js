@@ -19,6 +19,7 @@ import { diary } from './diary.js'
 import { album, comments } from './album.js'
 import { moderation } from './moderation.js'
 import { overview } from './overview.js'
+import { day } from './phases.js'
 const $ = (id) => document.getElementById(id)
 const requestedScenario = new URL(location.href).searchParams.get('escenario')
 let mode = requestedScenario === 'optimista' ? 'optimista' : 'pesimista'
@@ -170,12 +171,15 @@ function render() {
   moderator?.setAdmin(canModerate)
   book?.setAdmin(canModerate)
   notes?.setAdmin(Boolean(store?.admin && !visitorPreview))
-  $('stamp').textContent = store?.stamp
-    ? 'Actualizado el ' +
-      new Date(store.stamp).toLocaleDateString('es-ES', {
-        dateStyle: 'long',
-        timeZone: 'Europe/Madrid',
-      })
+  // El estado normal no aporta nada al visitante: solo se muestra si hay algo
+  // que avisar (borrador, copia guardada, calendario sin publicar).
+  $('status').classList.toggle(
+    'srOnly',
+    $('status').textContent === 'Publicación sincronizada',
+  )
+  const updated = lastUpdate()
+  $('stamp').textContent = updated
+    ? 'Última actualización: ' + day(updated)
     : store?.loadFailed || configError
       ? 'No se ha podido actualizar el seguimiento.'
       : 'Consultando la publicación…'
@@ -290,17 +294,34 @@ try {
     if (cachedStore.stamp) store = cachedStore
   }
 }
+// Fecha más reciente entre calendario, fotos, observaciones y comentarios.
+function lastUpdate() {
+  const madrid = (iso) =>
+    new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(
+      new Date(iso),
+    )
+  const days = [
+    store?.stamp && madrid(store.stamp),
+    gallery?.dates()[0],
+    ...(book?.rows ?? []).map((r) => madrid(r.published_at)),
+    notes?.latest() && madrid(notes.latest()),
+  ].filter(Boolean)
+  return days.sort().at(-1)
+}
 function extrasChanged() {
   extraVersion++
   render()
 }
-book = diary(api, extrasChanged)
+notes = comments(api?.db, () => {
+  book?.redraw()
+  extrasChanged()
+})
+book = diary(api, extrasChanged, notes)
 gallery = album(
   api?.db,
   extrasChanged,
   () => store?.published ?? fallback,
 )
-notes = comments(api?.db)
 moderator = moderation(api?.db, gallery.refresh)
 async function extras() {
   if (extraLoading || document.hidden || store?.editing || viewingEdit()) return
@@ -544,5 +565,11 @@ $('close').onclick = () => $('versions').close()
 
 if (!api && !window.ADRIO)
   window.addEventListener('online', () => location.reload(), { once: true })
+// La cabecera queda fija; su nombre solo aparece cuando la portada, que ya
+// lo muestra en grande, deja de verse.
+if ('IntersectionObserver' in window)
+  new IntersectionObserver(([entry]) =>
+    document.body.classList.toggle('coverVisible', entry.isIntersecting),
+  ).observe(document.querySelector('.cover h1'))
 if ('serviceWorker' in navigator && window.isSecureContext)
   navigator.serviceWorker.register('./sw.js').catch(() => {})

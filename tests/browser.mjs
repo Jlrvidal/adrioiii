@@ -318,6 +318,25 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.reload()
   await page.locator('#theme').selectOption('light')
+  // Sin repeticiones: un enlace por sección y portada sin textos duplicados.
+  assert.deepEqual(
+    await page
+      .locator('.navlinks a')
+      .evaluateAll((links) => links.map((l) => l.getAttribute('href'))),
+    ['#calendario', '#album', '#diario'],
+  )
+  assert.equal(
+    await page.locator('.cover p, .albumShortcut, #chartAlbum').count(),
+    0,
+  )
+  assert.match(
+    await page.locator('#stamp').textContent(),
+    /^Última actualización: /,
+  )
+  assert.equal(
+    await page.locator('#status').evaluate((e) => e.className),
+    'srOnly',
+  )
   await page.locator('#realista').click()
   await page.locator('#chart').scrollIntoViewIfNeeded()
   await shot('realista')
@@ -577,8 +596,7 @@ try {
   const prior = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
   dailyPhotos.push({ taken: prior, slot: 1, legacy: null })
   await page.reload()
-  await page.locator('#chartAlbum').click()
-  await page.locator('#monthDays button').last().click()
+  await page.locator('#albumDate').selectOption(prior)
   assert.equal(await page.locator('#albumDate').inputValue(), prior)
   await page.locator('#newerDay').click()
   assert.equal(await page.locator('#dailyImages figure').count(), 3)

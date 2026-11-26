@@ -209,6 +209,8 @@ export function album(db, changed, schedule) {
     $('newerDay').disabled = !newer
     $('olderDay').setAttribute('aria-label', view.older)
     $('newerDay').setAttribute('aria-label', view.newer)
+    // Sin fotos, el selector de vista y las flechas no sirven de nada.
+    $('album').classList.toggle('noPhotos', !rows.length)
     const list = view.rows(),
       frame = $('dailyImages')
     lazy?.disconnect()
@@ -231,7 +233,7 @@ export function album(db, changed, schedule) {
           !available
             ? 'El álbum no está disponible en este momento.'
             : !rows.length
-              ? 'Todavía no hay fotos en el álbum. Puedes enviar la primera aquí debajo.'
+              ? 'Todavía no hay fotos en el álbum.'
               : 'Todavía no hay fotos de esta fase.',
           'empty',
         ),
@@ -255,7 +257,7 @@ export function album(db, changed, schedule) {
           section = el('section', '', 'photoGroup'),
           grid = el('div', '', 'photoGrid')
         const heading = el(
-          'h4',
+          'h3',
           mode === 'month' ? day(group) : capital(monthName(group)),
         )
         heading.append(
@@ -309,7 +311,8 @@ export function album(db, changed, schedule) {
       ? 'Como administrador, tus fotos se publican al momento, sin revisión.'
       : 'Cualquiera puede enviar fotos. El administrador las revisa antes de que aparezcan en el álbum.'
     $('shareSteps').hidden = admin
-    $('chartAlbum').disabled = !days.length
+    // Para visitantes, los pasos ya explican la revisión.
+    $('shareHelp').hidden = !admin
     const signature = JSON.stringify([rows, available, admin])
     if (shown === signature) return
     shown = signature
@@ -368,22 +371,7 @@ export function album(db, changed, schedule) {
   }
   function openMonth(month) {
     // Las marcas mensuales del calendario abren el álbum de ese mes.
-    if (month) {
-      setMode('month', month, true)
-      return
-    }
-    const days = dates()
-    const list = $('monthDays')
-    list.replaceChildren()
-    for (const d of days) {
-      const b = el('button', day(d))
-      b.onclick = () => {
-        $('albumPicker').close()
-        choose(d, true)
-      }
-      list.append(b)
-    }
-    if (days.length) $('albumPicker').showModal()
+    if (month) setMode('month', month, true)
   }
   function move(direction) {
     const view = views[mode],
@@ -404,7 +392,6 @@ export function album(db, changed, schedule) {
   $('viewDay').onclick = () => setMode('day')
   $('viewMonth').onclick = () => setMode('month')
   $('viewPhase').onclick = () => setMode('phase')
-  $('chartAlbum').onclick = () => openMonth()
   function say(text, kind = '') {
     $('uploadMessage').textContent = text
     $('uploadMessage').className = kind
@@ -490,48 +477,47 @@ export function album(db, changed, schedule) {
   }
 }
 
-export function comments(db) {
+// Comentarios del administrador. Se muestran mezclados con las observaciones
+// en un único diario ordenado por fecha (ver diary.js).
+export function comments(db, changed = () => {}) {
   let items = [],
     admin = false,
     available = false,
     busy = false
+  function node(item) {
+    const row = el('article', '', 'siteComment'),
+      meta = el('div', '', 'entryMeta')
+    meta.append(el('time', day(item.posted_on)))
+    row.append(meta, el('p', item.body))
+    if (admin) {
+      const b = el('button', 'Eliminar')
+      b.onclick = async () => {
+        if (!confirm('¿Eliminar este comentario del diario?')) return
+        b.disabled = true
+        const { error } = await db
+          .from('adrio_comments')
+          .delete()
+          .eq('id', item.id)
+          .select('id')
+          .single()
+        if (error)
+          $('commentMessage').textContent = 'No se pudo eliminar el comentario.'
+        await refresh()
+      }
+      row.append(b)
+    }
+    return row
+  }
   function draw() {
     $('commentForm').hidden = !admin || !available
-    $('commentsList').replaceChildren()
-    for (const item of items) {
-      const row = el('div', '', 'siteComment')
-      row.append(el('time', day(item.posted_on)), el('p', item.body))
-      if (admin) {
-        const b = el('button', 'Eliminar')
-        b.onclick = async () => {
-          if (!confirm('¿Eliminar este comentario del diario?')) return
-          b.disabled = true
-          const { error } = await db
-            .from('adrio_comments')
-            .delete()
-            .eq('id', item.id)
-            .select('id')
-            .single()
-          if (error)
-            $('commentMessage').textContent =
-              'No se pudo eliminar el comentario.'
-          await refresh()
-        }
-        row.append(b)
-      }
-      $('commentsList').append(row)
-    }
-    if (!items.length)
-      $('commentsList').textContent = available
-        ? 'Todavía no hay comentarios.'
-        : 'Los comentarios están temporalmente fuera de servicio.'
+    changed()
   }
   async function refresh() {
     try {
       items = await pages(() =>
         db
           .from('adrio_comments')
-          .select('id,posted_on,body')
+          .select('id,posted_on,body,created_at')
           .order('posted_on', { ascending: false })
           .order('created_at', { ascending: false })
           .order('id'),
@@ -566,6 +552,10 @@ export function comments(db) {
   }
   return {
     refresh,
+    items: () => (available ? items : []),
+    latest: () =>
+      items.reduce((a, c) => (c.created_at > a ? c.created_at : a), ''),
+    node,
     setAdmin(v) {
       if (admin !== v) {
         admin = v
