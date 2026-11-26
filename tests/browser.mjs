@@ -358,6 +358,12 @@ try {
   await shot('phase-detail')
   await page.locator('#phaseDialog button').click()
   await page.locator('#diario').scrollIntoViewIfNeeded()
+  assert.equal(
+    await page.locator('#addDaily').textContent(),
+    'Enviar para revisión',
+  )
+  assert.equal(await page.locator('#addDaily').isDisabled(), true)
+  assert.ok(await page.locator('#shareSteps').isVisible())
   for (let i = 0; i < 2; i++) {
     await page.locator('#sharePhoto').setInputFiles({
       name: 'obra.png',
@@ -366,13 +372,21 @@ try {
         new URL('../assets/icon-192.png', import.meta.url),
       ),
     })
+    await page.locator('#dropChosen').waitFor()
+    assert.equal(await page.locator('#shareName').textContent(), 'obra.png')
+    if (i === 0) {
+      await page.locator('#photoUpload').scrollIntoViewIfNeeded()
+      await shot('upload-preview')
+    }
     await page.locator('#addDaily').click()
     await page
       .getByText(
         'Foto enviada. Se publicará cuando la revise el administrador.',
       )
       .waitFor()
+    assert.ok(await page.locator('#dropEmpty').isVisible())
   }
+  await shot('upload-sent')
   assert.equal(await page.locator('#dailyImages img').count(), 0)
   assert.match(await page.locator('#photoQuota').textContent(), /0 de 3/)
   assert.equal(await page.locator('#photoModeration').isVisible(), false)
@@ -544,6 +558,8 @@ try {
   await page.locator('#addDaily').click()
   await page.locator('#photoQuota').filter({ hasText: 'completo' }).waitFor()
   assert.equal(await page.locator('#dailyImages figure').count(), 3)
+  assert.equal(await page.locator('#addDaily').textContent(), 'Publicar foto')
+  assert.equal(await page.locator('#shareSteps').isVisible(), false)
   assert.equal(await page.locator('#addDaily').isDisabled(), true)
   page.once('dialog', (dialog) => dialog.accept())
   await page.locator('#dailyImages .removePhoto').last().click()

@@ -76,9 +76,11 @@ export async function addPhoto(db, blob, uploadId) {
   })
   if (error)
     throw Error(
-      /tres fotos|cola de fotos pendientes/.test(error.message)
-        ? error.message
-        : 'No se pudo subir la foto. Vuelve a intentarlo.',
+      /tres fotos/.test(error.message)
+        ? 'El álbum de hoy ya tiene sus 3 fotos. Podrás enviar otra mañana.'
+        : /cola de fotos pendientes/.test(error.message)
+          ? 'Ahora mismo hay varias fotos esperando revisión. Vuelve a intentarlo más tarde.'
+          : 'No se ha podido enviar la foto. Comprueba la conexión y vuelve a intentarlo.',
     )
   if (data !== 'pendiente' && !dailyPath.test(data))
     throw Error('No se ha confirmado la subida.')
