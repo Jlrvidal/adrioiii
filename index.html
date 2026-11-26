@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=moderacion1" />
+    <link rel="stylesheet" href="./style.css?v=calendario1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=moderacion1"></script>
-    <script type="module" src="./src/app.js?v=moderacion1"></script>
+    <script defer src="./config.js?v=calendario1"></script>
+    <script type="module" src="./src/app.js?v=calendario1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -95,7 +95,7 @@
         </article>
         <article>
           <span class="eyelabel">Hitos confirmados</span
-          ><strong id="count"></strong><small id="expected"></small>
+          ><strong id="count"></strong>
         </article>
       </section>
       <section id="calendario" class="planning">
@@ -110,10 +110,9 @@
           </div>
         </div>
         <div class="toolbar">
-          <div>
-            <button id="gantt">Gantt</button
-            ><button id="vertical">Por fases</button>
-          </div>
+          <span class="toolhint"
+            >Pulsa una fase o su barra para ver qué incluye.</span
+          >
           <button id="goToday">Ir a hoy</button
           ><button id="chartAlbum" disabled>Fotos por día</button>
         </div>
@@ -123,18 +122,97 @@
         <p id="compareKey" hidden>
           R · Realista (arriba) &nbsp; O · Optimista (abajo)
         </p>
-        <div id="phaseList"></div>
         <div class="chartfoot">
           <span id="yearKey"></span><small id="today"></small>
         </div>
-        <details class="method">
-          <summary>Cómo leer las previsiones</summary>
-          <p>
-            Las dos previsiones parten de duraciones y solapamientos diferentes.
-            La línea de hoy indica el paso del tiempo. Solo los hitos
-            confirmados acreditan trabajos terminados.
-          </p>
-        </details>
+        <section class="readGuide" aria-labelledby="readGuideTitle">
+          <h3 id="readGuideTitle">Cómo leer el calendario</h3>
+          <ul>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gBar">5 m</i></span
+              >
+              <p>
+                <strong>Cada fila es una fase de la obra</strong>, en el orden
+                en que se hace. La barra va del mes en que empieza al mes en que
+                termina; el número son los meses que dura.
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gBar short">3 m</i
+                ><i class="gBar short shifted">4 m</i></span
+              >
+              <p>
+                <strong>Que las barras se pisen es normal.</strong> Una fase
+                puede empezar antes de que acabe la anterior, por ejemplo las
+                instalaciones de las plantas bajas mientras se terminan las
+                fachadas.
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gToday"></i
+              ></span>
+              <p>
+                <strong>La línea HOY es la fecha actual.</strong> Lo que queda a
+                su izquierda ya debería estar hecho según la previsión; lo de la
+                derecha está por llegar. «Ir a hoy» lleva el calendario hasta
+                esa línea, y en el móvil puedes deslizarlo hacia los lados.
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gBar done">✓ 4 m</i></span
+              >
+              <p>
+                <strong>Una barra con ✓ y recuadro es un hito confirmado</strong
+                >: esa fase está terminada. Solo estas barras indican trabajo
+                acabado; el resto son previsiones.
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gBar over">6 m</i></span
+              >
+              <p>
+                <strong>Una barra con borde discontinuo</strong> ya debería
+                haber terminado según la previsión, pero todavía no se ha
+                confirmado.
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gYear y0"></i><i class="gYear y1"></i
+                ><i class="gYear y2"></i
+              ></span>
+              <p>
+                <strong>Los colores indican el año</strong> (leyenda bajo el
+                calendario), para ver de un vistazo en qué año cae cada fase.
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gBar mini">R</i><i class="gBar mini alt">O</i></span
+              >
+              <p>
+                <strong>Hay dos previsiones.</strong> La realista deja margen
+                para imprevistos; la optimista supone que todo sale bien. Juntas
+                dan una horquilla de fechas. «Comparar» las muestra a la vez:
+                arriba la realista (R) y abajo la optimista (O).
+              </p>
+            </li>
+            <li>
+              <span class="sample" aria-hidden="true"
+                ><i class="gPhoto">▣</i></span
+              >
+              <p>
+                <strong>Fila «Fotos de obra»:</strong> cada ▣ marca un mes con
+                fotos. Púlsalo para verlas.
+              </p>
+            </li>
+          </ul>
+        </section>
       </section>
       <div class="journey" id="journey" aria-label="Hitos de la obra"></div>
       <section id="diario" class="journal">
