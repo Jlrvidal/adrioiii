@@ -217,6 +217,7 @@ function render() {
       now,
       Boolean(store?.stamp),
       book?.rows ?? [],
+      gallery,
     )
     renderChart($('chart'), state, mode, now, enabled && !compare, {
       photoDays: gallery?.dates() ?? [],
@@ -294,7 +295,11 @@ function extrasChanged() {
   render()
 }
 book = diary(api, extrasChanged)
-gallery = album(api?.db, extrasChanged)
+gallery = album(
+  api?.db,
+  extrasChanged,
+  () => store?.published ?? fallback,
+)
 notes = comments(api?.db)
 moderator = moderation(api?.db, gallery.refresh)
 async function extras() {

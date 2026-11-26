@@ -356,7 +356,7 @@ try {
   ])
     await page.locator('#phaseBody h3', { hasText: title }).waitFor()
   await shot('phase-detail')
-  await page.locator('#phaseDialog button').click()
+  await page.locator('#phaseDialog form button').click()
   await page.locator('#diario').scrollIntoViewIfNeeded()
   assert.equal(
     await page.locator('#addDaily').textContent(),
@@ -584,6 +584,52 @@ try {
   assert.equal(await page.locator('#dailyImages figure').count(), 3)
   await page.locator('#album').scrollIntoViewIfNeeded()
   await shot('album-days')
+  // Vista por mes: agrupada por días, con carga diferida.
+  await page.locator('#viewMonth').click()
+  assert.equal(
+    await page.locator('#viewMonth').getAttribute('aria-pressed'),
+    'true',
+  )
+  assert.ok((await page.locator('#dailyImages .photoGroup').count()) >= 1)
+  await page
+    .locator('#dailyImages .photoGrid img[src^="data:"]')
+    .first()
+    .waitFor()
+  await shot('album-month')
+  // Vista por fase: fotos repartidas por varios meses del calendario.
+  dailyPhotos.push(
+    ...['2027-03-10', '2027-05-12', '2027-09-20', '2028-02-14'].map(
+      (taken) => ({ taken, slot: 1, legacy: null }),
+    ),
+  )
+  await page.reload()
+  await page.locator('#viewPhase').click()
+  assert.equal(await page.locator('#albumDate option').count(), 7)
+  const labels = await page.locator('#albumDate option').allTextContents()
+  const withPhotos = labels.findIndex((t) => !/\(0\)$/.test(t))
+  assert.ok(withPhotos >= 0, 'Ninguna fase tiene fotos')
+  await page.locator('#albumDate').selectOption(String(withPhotos))
+  assert.ok((await page.locator('#dailyImages .photoGroup').count()) >= 1)
+  assert.match(
+    await page.locator('#albumNote').textContent(),
+    /calendario realista/,
+  )
+  await page.locator('#album').scrollIntoViewIfNeeded()
+  await shot('album-phase')
+  await page.locator('#viewDay').click()
+  assert.equal(await page.locator('#albumNote').textContent(), '')
+  // La ficha de una fase con fotos enlaza con el álbum filtrado.
+  await page.locator('#chart button.caption').nth(withPhotos).click()
+  await page.locator('#phaseDialog .phasePhotos').click()
+  assert.equal(
+    await page.locator('#viewPhase').getAttribute('aria-pressed'),
+    'true',
+  )
+  assert.equal(
+    await page.locator('#albumDate').inputValue(),
+    String(withPhotos),
+  )
+  await page.locator('#viewDay').click()
   await page.locator('#history').click()
   await page.locator('#list button').first().click()
   await page.locator('#apply').click()

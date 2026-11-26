@@ -1903,3 +1903,64 @@ footer #notice:empty {
     display: none;
   }
 }
+
+/* Álbum: vista por día, mes o fase */
+.albumBar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: -0.25rem 0 1rem;
+}
+#albumNote {
+  color: var(--muted);
+  max-width: 60ch;
+}
+#albumNote:empty {
+  display: none;
+}
+#dailyImages[data-count='grid'] {
+  display: block;
+}
+.photoGroup + .photoGroup {
+  margin-top: 22px;
+}
+.photoGroup h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 8px;
+  font: normal 17px/1.3 var(--display);
+}
+.photoGroup h4 small {
+  font:
+    12px system-ui,
+    sans-serif;
+  color: var(--muted);
+}
+.photoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
+  gap: 8px;
+}
+.photoGrid figure {
+  aspect-ratio: 4 / 3;
+}
+@media (max-width: 600px) {
+  .photoGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .albumView button {
+    min-height: 36px;
+  }
+}
+.phasePhotos {
+  margin-top: 16px;
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+#phaseBody .phasePhotos {
+  margin: 4px 0 6px;
+}

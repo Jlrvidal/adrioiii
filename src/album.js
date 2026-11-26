@@ -1,5 +1,6 @@
 import { element as el } from './chart.js'
 import { day } from './phases.js'
+import { defaults, format, offsetOf, phases } from './schedule.js'
 import { optimize, addPhoto, photoSource } from './photos.js'
 
 const $ = (id) => document.getElementById(id)
@@ -7,6 +8,13 @@ export const madridDay = () =>
   new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' }).format(
     new Date(),
   )
+const monthName = (ym) =>
+  new Intl.DateTimeFormat('es-ES', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(ym + '-01T12:00:00Z'))
+const capital = (text) => text[0].toUpperCase() + text.slice(1)
 const key = (row) => row.taken + '/' + row.slot + '.jpg'
 const cacheKey = (row) =>
   key(row) + ':' + (row.photo_version ?? row.legacy ?? '')
@@ -19,7 +27,10 @@ export async function pages(query) {
     if (data.length < 100) return items
   }
 }
-export function album(db, changed) {
+export function album(db, changed, schedule) {
+  let mode = 'day',
+    month = '',
+    phase = 0
   let rows = [],
     selected = '',
     available = false,
@@ -48,66 +59,106 @@ export function album(db, changed) {
             })
         : photoSource(db, key(row))
       sources.set(id, pending)
-      if (sources.size > 12) sources.delete(sources.keys().next().value)
+      if (sources.size > 36) sources.delete(sources.keys().next().value)
       pending.catch(() => sources.delete(id))
     }
     return sources.get(id)
   }
   const dates = () => [...new Set(rows.map((r) => r.taken))]
-  function choose(date, scroll = false) {
-    selected = date
-    $('albumDate').value = date
-    const daily = rows.filter((r) => r.taken === date)
-    const frame = $('dailyImages')
-    frame.replaceChildren()
-    // El mosaico cambia según haya 1, 2 o 3 fotos ese día.
-    frame.dataset.count = daily.length
-    if (!daily.length)
-      frame.append(
-        el(
-          'p',
-          available
-            ? 'Todavía no hay fotos en el álbum. Puedes enviar la primera aquí debajo.'
-            : 'El álbum no está disponible en este momento.',
-          'empty',
-        ),
-      )
-    daily.forEach((row, n) => {
-      const figure = el('figure'),
-        button = el('button', '', 'photoOpen'),
-        img = el('img')
-      img.alt = 'Foto ' + (n + 1) + ' de ' + daily.length + ' del ' + day(date)
-      button.type = 'button'
-      button.title = 'Ampliar la foto'
-      button.onclick = () => {
-        const big = img.cloneNode()
-        $('photoBody').replaceChildren(big, el('p', img.alt))
-        $('photoDialog').showModal()
-      }
-      button.append(img)
-      figure.append(button)
-      if (admin) {
-        const remove = el('button', 'Eliminar', 'removePhoto')
-        remove.type = 'button'
-        remove.setAttribute('aria-label', 'Eliminar ' + img.alt.toLowerCase())
-        remove.onclick = async () => {
-          if (!admin || !confirm('¿Eliminar esta foto del álbum?')) return
-          remove.disabled = true
-          const { error } = await db.rpc('adrio_remove_photo', {
-            taken_on: row.taken,
-            position_in_day: row.slot,
-          })
-          say(error ? error.message : 'Foto eliminada.', error ? 'error' : 'ok')
-          if (error) remove.disabled = false
-          else {
-            sources.delete(cacheKey(row))
-            await refresh()
-            window.dispatchEvent(new Event('adrio-photo-removed'))
-          }
+  const months = () => [...new Set(rows.map((r) => r.taken.slice(0, 7)))]
+  // Las fotos no guardan la fase: se asignan por fecha según el calendario
+  // realista publicado (o las fechas confirmadas, que coinciden en ambos).
+  function phaseRange(i) {
+    const p = (schedule()?.plans ?? defaults().plans).pesimista[i]
+    return [p.s, p.s + p.d]
+  }
+  function inPhase(row, i) {
+    const n = offsetOf(row.taken.slice(0, 7)),
+      [from, to] = phaseRange(i)
+    return n >= from && n < to
+  }
+  const views = {
+    day: {
+      label: 'Día',
+      id: 'viewDay',
+      older: 'Día anterior con fotos',
+      newer: 'Día siguiente con fotos',
+      options: () => dates().map((d) => [d, day(d)]),
+      value: () => selected,
+      set: (v) => (selected = v),
+      rows: () => rows.filter((r) => r.taken === selected),
+      step: 1,
+    },
+    month: {
+      label: 'Mes',
+      id: 'viewMonth',
+      older: 'Mes anterior con fotos',
+      newer: 'Mes siguiente con fotos',
+      options: () =>
+        months().map((m) => [
+          m,
+          capital(monthName(m)) +
+            ' (' +
+            rows.filter((r) => r.taken.startsWith(m)).length +
+            ')',
+        ]),
+      value: () => month,
+      set: (v) => (month = v),
+      rows: () => rows.filter((r) => r.taken.startsWith(month)),
+      step: 1,
+    },
+    phase: {
+      label: 'Fase',
+      id: 'viewPhase',
+      older: 'Fase anterior',
+      newer: 'Fase siguiente',
+      options: () =>
+        phases.map(([, name], i) => [
+          String(i),
+          name + ' (' + rows.filter((r) => inPhase(r, i)).length + ')',
+        ]),
+      value: () => String(phase),
+      set: (v) => (phase = Number(v)),
+      rows: () => rows.filter((r) => inPhase(r, phase)),
+      step: -1,
+    },
+  }
+  function figure(row, alt, list) {
+    const box = el('figure'),
+      button = el('button', '', 'photoOpen'),
+      img = el('img')
+    img.alt = alt
+    button.type = 'button'
+    button.title = 'Ampliar la foto'
+    button.onclick = () => {
+      const big = img.cloneNode()
+      $('photoBody').replaceChildren(big, el('p', img.alt))
+      $('photoDialog').showModal()
+    }
+    button.append(img)
+    box.append(button)
+    if (admin) {
+      const remove = el('button', 'Eliminar', 'removePhoto')
+      remove.type = 'button'
+      remove.setAttribute('aria-label', 'Eliminar ' + alt.toLowerCase())
+      remove.onclick = async () => {
+        if (!admin || !confirm('¿Eliminar esta foto del álbum?')) return
+        remove.disabled = true
+        const { error } = await db.rpc('adrio_remove_photo', {
+          taken_on: row.taken,
+          position_in_day: row.slot,
+        })
+        say(error ? error.message : 'Foto eliminada.', error ? 'error' : 'ok')
+        if (error) remove.disabled = false
+        else {
+          sources.delete(cacheKey(row))
+          await refresh()
+          window.dispatchEvent(new Event('adrio-photo-removed'))
         }
-        figure.append(remove)
       }
-      frame.append(figure)
+      box.append(remove)
+    }
+    const load = () =>
       source(row).then(
         (src) => {
           img.src = src
@@ -117,12 +168,125 @@ export function album(db, changed) {
             el('span', 'No se ha podido cargar esta foto.', 'photoMissing'),
           ),
       )
-    })
-    const days = dates(),
-      idx = days.indexOf(date)
-    $('olderDay').disabled = idx < 0 || idx === days.length - 1
-    $('newerDay').disabled = idx <= 0
+    // En las vistas por mes o fase solo se descargan las fotos que se ven.
+    if (list && lazy) {
+      box.load = load
+      lazy.observe(box)
+    } else load()
+    return box
+  }
+  const lazy =
+    'IntersectionObserver' in window
+      ? new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries)
+              if (entry.isIntersecting) {
+                lazy.unobserve(entry.target)
+                entry.target.load()
+              }
+          },
+          { rootMargin: '300px' },
+        )
+      : null
+  function show(scroll = false) {
+    const view = views[mode],
+      options = view.options(),
+      select = $('albumDate')
+    for (const [name, v] of Object.entries(views))
+      $(v.id).setAttribute('aria-pressed', String(name === mode))
+    if (!options.some(([v]) => v === view.value()))
+      view.set(options[0]?.[0] ?? '')
+    select.replaceChildren()
+    for (const [v, text] of options) select.add(new Option(text, v))
+    if (!options.length) select.add(new Option('Sin fotos', ''))
+    select.disabled = !options.length
+    select.value = view.value()
+    select.setAttribute('aria-label', view.label + ' del álbum')
+    const idx = options.findIndex(([v]) => v === view.value()),
+      older = options[idx + view.step],
+      newer = options[idx - view.step]
+    $('olderDay').disabled = !older
+    $('newerDay').disabled = !newer
+    $('olderDay').setAttribute('aria-label', view.older)
+    $('newerDay').setAttribute('aria-label', view.newer)
+    const list = view.rows(),
+      frame = $('dailyImages')
+    lazy?.disconnect()
+    frame.replaceChildren()
+    frame.dataset.count = mode === 'day' ? list.length : 'grid'
+    $('albumNote').textContent = ''
+    if (mode === 'phase') {
+      const [from, to] = phaseRange(phase)
+      $('albumNote').textContent =
+        'Fotos tomadas durante esta fase según el calendario realista (' +
+        format(from) +
+        ' – ' +
+        format(to) +
+        ').'
+    }
+    if (!list.length) {
+      frame.append(
+        el(
+          'p',
+          !available
+            ? 'El álbum no está disponible en este momento.'
+            : !rows.length
+              ? 'Todavía no hay fotos en el álbum. Puedes enviar la primera aquí debajo.'
+              : 'Todavía no hay fotos de esta fase.',
+          'empty',
+        ),
+      )
+    } else if (mode === 'day') {
+      // El mosaico cambia según haya 1, 2 o 3 fotos ese día.
+      list.forEach((row, n) =>
+        frame.append(
+          figure(
+            row,
+            'Foto ' + (n + 1) + ' de ' + list.length + ' del ' + day(row.taken),
+          ),
+        ),
+      )
+    } else {
+      // Por mes se agrupa por días; por fase, por meses.
+      const groupOf = (row) =>
+        mode === 'month' ? row.taken : row.taken.slice(0, 7)
+      for (const group of [...new Set(list.map(groupOf))]) {
+        const items = list.filter((r) => groupOf(r) === group),
+          section = el('section', '', 'photoGroup'),
+          grid = el('div', '', 'photoGrid')
+        const heading = el(
+          'h4',
+          mode === 'month' ? day(group) : capital(monthName(group)),
+        )
+        heading.append(
+          el('small', items.length + (items.length === 1 ? ' foto' : ' fotos')),
+        )
+        section.append(heading, grid)
+        for (const row of items)
+          grid.append(figure(row, 'Foto del ' + day(row.taken), true))
+        frame.append(section)
+      }
+    }
     if (scroll) $('album').scrollIntoView({ block: 'start' })
+  }
+  function setMode(next, value, scroll = false) {
+    if (next === 'month')
+      month = value ?? (selected || dates()[0] || '').slice(0, 7)
+    if (next === 'phase')
+      phase =
+        value ??
+        Math.max(
+          0,
+          phases.findIndex((_, i) =>
+            inPhase({ taken: selected || dates()[0] || madridDay() }, i),
+          ),
+        )
+    if (next === 'day' && value) selected = value
+    mode = next
+    show(scroll)
+  }
+  function choose(date, scroll = false) {
+    setMode('day', date, scroll)
   }
   function draw() {
     const days = dates(),
@@ -149,11 +313,8 @@ export function album(db, changed) {
     const signature = JSON.stringify([rows, available, admin])
     if (shown === signature) return
     shown = signature
-    $('albumDate').replaceChildren()
-    for (const date of days) $('albumDate').add(new Option(day(date), date))
-    $('albumDate').disabled = !days.length
-    if (!days.length) $('albumDate').add(new Option('Sin fotos', ''))
-    choose(days.includes(selected) ? selected : days[0] || '')
+    if (!days.includes(selected)) selected = days[0] || ''
+    show()
     const latest = rows.filter((r) => r.taken === days[0]).at(-1)
     const id = latest && cacheKey(latest)
     if (coverKey !== id && (coverKey || id)) {
@@ -206,11 +367,12 @@ export function album(db, changed) {
     draw()
   }
   function openMonth(month) {
-    const days = dates().filter((d) => !month || d.startsWith(month))
-    if (days.length === 1) {
-      choose(days[0], true)
+    // Las marcas mensuales del calendario abren el álbum de ese mes.
+    if (month) {
+      setMode('month', month, true)
       return
     }
+    const days = dates()
     const list = $('monthDays')
     list.replaceChildren()
     for (const d of days) {
@@ -223,9 +385,25 @@ export function album(db, changed) {
     }
     if (days.length) $('albumPicker').showModal()
   }
-  $('albumDate').onchange = (e) => choose(e.target.value)
-  $('olderDay').onclick = () => choose(dates()[dates().indexOf(selected) + 1])
-  $('newerDay').onclick = () => choose(dates()[dates().indexOf(selected) - 1])
+  function move(direction) {
+    const view = views[mode],
+      options = view.options(),
+      idx = options.findIndex(([v]) => v === view.value()),
+      next = options[idx + direction * view.step]
+    if (next) {
+      view.set(next[0])
+      show()
+    }
+  }
+  $('albumDate').onchange = (e) => {
+    views[mode].set(e.target.value)
+    show()
+  }
+  $('olderDay').onclick = () => move(1)
+  $('newerDay').onclick = () => move(-1)
+  $('viewDay').onclick = () => setMode('day')
+  $('viewMonth').onclick = () => setMode('month')
+  $('viewPhase').onclick = () => setMode('phase')
   $('chartAlbum').onclick = () => openMonth()
   function say(text, kind = '') {
     $('uploadMessage').textContent = text
@@ -277,7 +455,10 @@ export function album(db, changed) {
       retry.blob ??= await optimize(file)
       say('Enviando…')
       const path = await addPhoto(db, retry.blob, retry.id)
-      if (path !== 'pendiente') selected = path.slice(0, 10)
+      if (path !== 'pendiente') {
+        selected = path.slice(0, 10)
+        mode = 'day'
+      }
       retry = null
       $('photoUpload').reset()
       showChosen(null)
@@ -299,6 +480,8 @@ export function album(db, changed) {
     refresh,
     openMonth,
     dates,
+    phaseCount: (i) => rows.filter((r) => inPhase(r, i)).length,
+    showPhase: (i) => setMode('phase', i, true),
     setAdmin(value) {
       if (admin === value) return
       admin = value
