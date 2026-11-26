@@ -1,7 +1,13 @@
 import { element as el } from './chart.js'
 import { day } from './phases.js'
 import { defaults, format, offsetOf, phases } from './schedule.js'
-import { optimize, addPhoto, photoSource } from './photos.js'
+import {
+  optimize,
+  addPhoto,
+  addPhotoOn,
+  photoDate,
+  photoSource,
+} from './photos.js'
 
 const $ = (id) => document.getElementById(id)
 export const madridDay = () =>
@@ -37,6 +43,8 @@ export function album(db, changed, schedule) {
     version = 0,
     busy = false,
     admin = false
+  // Fotos del administrador preparadas para publicar, cada una con su fecha.
+  let batch = []
   let retry,
     coverKey = '',
     shown = ''
@@ -294,21 +302,36 @@ export function album(db, changed, schedule) {
     const days = dates(),
       today = madridDay(),
       count = rows.filter((r) => r.taken === today).length
-    $('photoQuota').textContent = available
-      ? count === 3
-        ? 'El álbum de hoy ya está completo (3 de 3). Podrás enviar otra foto mañana.'
-        : count + ' de 3 fotos publicadas hoy.'
-      : 'El envío de fotos no está disponible en este momento.'
-    const closed = busy || !available || count >= 3
+    $('photoQuota').textContent = !available
+      ? 'El envío de fotos no está disponible en este momento.'
+      : admin
+        ? 'Hasta 3 fotos por día. Cada foto va al día de su fecha.'
+        : count === 3
+          ? 'El álbum de hoy ya está completo (3 de 3). Podrás enviar otra foto mañana.'
+          : count + ' de 3 fotos publicadas hoy.'
+    // El administrador puede publicar en otros días aunque hoy esté completo.
+    const full = !admin && count >= 3
+    const closed = busy || !available || full
     $('sharePhoto').disabled = closed
-    $('photoUpload').classList.toggle('closed', !available || count >= 3)
-    $('addDaily').disabled = closed || !$('sharePhoto').files.length
-    $('addDaily').textContent = admin ? 'Publicar foto' : 'Enviar para revisión'
+    $('sharePhoto').multiple = admin
+    $('photoUpload').classList.toggle('closed', !available || full)
+    const waiting = batch.filter((i) => i.status !== 'done')
+    $('addDaily').disabled = admin
+      ? closed || !waiting.length || waiting.some((i) => !i.date)
+      : closed || !$('sharePhoto').files.length
+    $('addDaily').textContent = admin
+      ? waiting.length > 1
+        ? 'Publicar ' + waiting.length + ' fotos'
+        : 'Publicar foto'
+      : 'Enviar para revisión'
+    $('dropTitle').textContent = admin
+      ? 'Elige una o varias fotos'
+      : 'Elige una foto'
     $('shareTitle').textContent = admin
-      ? 'Publica una foto de la obra'
+      ? 'Publica fotos de la obra'
       : 'Envía una foto de la obra'
     $('shareHelp').textContent = admin
-      ? 'Como administrador, tus fotos se publican al momento, sin revisión.'
+      ? 'Como administrador, tus fotos se publican al momento, sin revisión. Puedes elegir varias a la vez: cada una va al día en que se hizo, y puedes cambiar la fecha.'
       : 'Cualquiera puede enviar fotos. El administrador las revisa antes de que aparezcan en el álbum.'
     $('shareSteps').hidden = admin
     // Para visitantes, los pasos ya explican la revisión.
@@ -411,10 +434,135 @@ export function album(db, changed, schedule) {
     if ($('sharePreview').getAttribute('src'))
       $('sharePreview').removeAttribute('src')
   }
-  $('sharePhoto').onchange = () => {
+  $('sharePhoto').onchange = async () => {
     retry = null
     say('')
-    showChosen($('sharePhoto').files[0])
+    if (!admin) {
+      showChosen($('sharePhoto').files[0])
+      return
+    }
+    // Administrador: las fotos se acumulan en una lista, cada una con su fecha.
+    const files = [...$('sharePhoto').files]
+    $('photoUpload').reset()
+    batch = batch.filter((i) => i.status !== 'done')
+    const room = Math.max(0, 30 - batch.length)
+    for (const file of files.slice(0, room)) {
+      const found = await photoDate(file, madridDay())
+      batch.push({
+        file,
+        id: crypto.randomUUID(),
+        url: URL.createObjectURL(file),
+        date: found?.date ?? '',
+        source: found?.source ?? 'none',
+        status: '',
+        message: '',
+      })
+    }
+    if (files.length > room)
+      say('Se pueden preparar hasta 30 fotos a la vez.', 'error')
+    drawBatch()
+  }
+  // Cuántas fotos tendría ya un día contando las anteriores de la lista.
+  function used(date, before) {
+    return (
+      rows.filter((r) => r.taken === date).length +
+      batch
+        .slice(0, before)
+        .filter((i) => i.date === date && i.status !== 'done').length
+    )
+  }
+  function hint(item, n) {
+    if (item.status === 'done' || item.status === 'error') return item.message
+    if (!item.date) return 'La foto no tiene fecha: elígela.'
+    if (used(item.date, n) >= 3)
+      return 'El ' + day(item.date) + ' ya tiene 3 fotos: elige otra fecha.'
+    const origin = {
+      camera: 'Fecha tomada de la foto',
+      file: 'Fecha del archivo, compruébala',
+    }[item.source]
+    return (
+      (origin ? origin + '. ' : '') + 'Irá al álbum del ' + day(item.date) + '.'
+    )
+  }
+  function drawBatch() {
+    const list = $('shareBatch')
+    list.replaceChildren()
+    list.hidden = !admin || !batch.length
+    batch.forEach((item, n) => {
+      const li = el('li', '', item.status),
+        img = el('img'),
+        info = el('div'),
+        label = el('label', 'Fecha '),
+        input = el('input'),
+        remove = el('button', 'Quitar')
+      img.src = item.url
+      img.alt = ''
+      input.type = 'date'
+      input.min = '2020-01-01'
+      input.max = madridDay()
+      input.value = item.date
+      input.disabled = busy || item.status === 'done'
+      input.onchange = () => {
+        item.date = input.value
+        item.source = 'manual'
+        if (item.status === 'error') item.status = ''
+        drawBatch()
+      }
+      label.append(input)
+      remove.type = 'button'
+      remove.disabled = busy
+      remove.setAttribute('aria-label', 'Quitar ' + item.file.name)
+      remove.onclick = () => {
+        URL.revokeObjectURL(item.url)
+        batch.splice(n, 1)
+        drawBatch()
+      }
+      info.append(
+        el('strong', item.file.name),
+        label,
+        el('small', hint(item, n), 'batchHint'),
+      )
+      li.append(img, info, remove)
+      list.append(li)
+    })
+    draw()
+  }
+  async function publishBatch() {
+    const todo = batch.filter((i) => i.status !== 'done' && i.date)
+    let ok = 0,
+      last = ''
+    for (const [k, item] of todo.entries()) {
+      say('Publicando ' + (k + 1) + ' de ' + todo.length + '…')
+      try {
+        item.blob ??= await optimize(item.file)
+        const path = await addPhotoOn(db, item.blob, item.id, item.date)
+        item.status = 'done'
+        last = path.slice(0, 10)
+        item.message = 'Publicada en el álbum del ' + day(last) + '.'
+        ok++
+      } catch (err) {
+        item.status = 'error'
+        item.message = err.message
+      }
+      drawBatch()
+    }
+    const all = ok === todo.length
+    say(
+      all
+        ? ok === 1
+          ? 'Foto publicada en el álbum del ' + day(last) + '.'
+          : 'Publicadas ' + ok + ' fotos.'
+        : 'Publicadas ' +
+            ok +
+            ' de ' +
+            todo.length +
+            '. Revisa las que quedan en la lista.',
+      all ? 'ok' : 'error',
+    )
+    if (last) {
+      selected = last
+      mode = 'day'
+    }
   }
   const zone = $('dropzone')
   zone.ondragenter = zone.ondragover = (e) => {
@@ -432,6 +580,23 @@ export function album(db, changed, schedule) {
   }
   $('photoUpload').onsubmit = async (e) => {
     e.preventDefault()
+    if (admin) {
+      if (busy || !available) return
+      busy = true
+      drawBatch()
+      try {
+        await publishBatch()
+      } finally {
+        busy = false
+        await refresh()
+        // Las publicadas salen de la lista; las que fallaron se quedan.
+        for (const item of batch)
+          if (item.status === 'done') URL.revokeObjectURL(item.url)
+        batch = batch.filter((i) => i.status !== 'done')
+        drawBatch()
+      }
+      return
+    }
     const file = $('sharePhoto').files[0]
     if (busy || !file || !available) return
     busy = true
@@ -472,7 +637,10 @@ export function album(db, changed, schedule) {
     setAdmin(value) {
       if (admin === value) return
       admin = value
-      draw()
+      for (const item of batch) URL.revokeObjectURL(item.url)
+      batch = []
+      showChosen(null)
+      drawBatch()
     },
   }
 }

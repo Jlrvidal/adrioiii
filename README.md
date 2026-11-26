@@ -63,6 +63,25 @@ Después de 001, ejecuta `migrations/002_resident_portal.sql` completa en otra c
 8. Sirve una copia del frontend con la URL, clave y CSP de ensayo; configura el UUID de ensayo en la base. Abre una ventana privada, cambia el escenario y comprueba que solo hay lecturas de `schedule`. Entra con una cuenta distinta del administrador y verifica la vista de lectura. Entra con el administrador, cambia un mes, recarga, comprueba la publicación desde otra ventana y restaura la revisión desde **Historial**. Repite con dos ventanas editando la misma revisión para comprobar el conflicto. El SQL Editor con rol propietario no reproduce las restricciones de un visitante.
 9. Con la copia verificada y autorización para el despliegue, repite los pasos de copia, Auth y migración en producción. Guarda la salida del preflight y la revisión anterior para poder comparar. Ejecuta la migración antes del cambio de frontend.
 
+### Aviso por correo de fotos pendientes y fotos con fecha (migración 005)
+
+`migrations/005_notify_and_dated_photos.sql` añade dos cosas:
+
+- **Aviso por correo.** Cuando un visitante deja una foto en la cola, la base de datos envía un correo al administrador con la foto adjunta y un enlace «Revisar foto» (`?revisar=<id>`). El enlace abre la web, pide iniciar sesión si hace falta y señala esa foto en **Fotos pendientes**. No se puede aprobar desde el correo sin iniciar sesión. Como la cola admite 3 fotos, nunca llegan más de 3 avisos seguidos sin revisar.
+- **Fotos del administrador con fecha.** `adrio_add_photo_on` permite al administrador publicar en cualquier día entre el 1 de enero de 2020 y hoy, con el mismo límite de 3 fotos por día. En la web puede elegir varias fotos a la vez; cada una toma la fecha de la cámara (EXIF) o, si no la tiene, la del archivo, y se puede cambiar antes de publicar.
+
+Pasos, una sola vez:
+
+1. Crea una cuenta en [Resend](https://resend.com) con el correo donde quieres recibir los avisos. En **API Keys** crea una clave con permiso **Sending access** (solo envío).
+2. En el **SQL Editor** de Supabase guarda la clave y tu correo en Vault. No los pongas en el repositorio:
+   `select vault.create_secret('re_...', 'adrio_resend_key');`
+   `select vault.create_secret('tu-correo@ejemplo.com', 'adrio_notify_to');`
+   Sin un dominio verificado en Resend, el remitente es `onboarding@resend.dev` y solo puede enviar al correo de tu cuenta de Resend. Si verificas un dominio, guarda también el remitente: `select vault.create_secret('Adrio III <avisos@tu-dominio.com>', 'adrio_notify_from');`
+3. Ejecuta `migrations/005_notify_and_dated_photos.sql` completa, una vez, después de 004. Activa la extensión `pg_net` si no lo estaba.
+4. Prueba: desde una ventana privada envía una foto. Debe llegarte el correo en uno o dos minutos. Si no llega, consulta `select status_code, error_msg, content from net._http_response order by created desc limit 5;` (las respuestas se guardan unas horas).
+
+La clave viaja en la cabecera de la petición, y pg_net guarda las peticiones pendientes en `net.http_request_queue` hasta enviarlas. La migración retira el acceso a esas tablas a los roles de la web, pero cualquier rol con acceso directo a la base podría leerla mientras tanto. Por eso conviene una clave de solo envío. Para cambiar la clave, el correo o desactivar los avisos, edita o borra los secretos desde la sección **Vault** del panel de Supabase (o con `vault.update_secret`); sin secretos no se envía nada y las fotos siguen entrando en la cola.
+
 [Configuración de Auth](https://supabase.com/docs/guides/auth/general-configuration) · [Contraseñas](https://supabase.com/docs/guides/auth/passwords) · [Administración de una cuenta existente](https://supabase.com/docs/reference/javascript/auth-admin-updateuserbyid)
 
 ## Publicar y volver atrás
