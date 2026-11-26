@@ -359,7 +359,7 @@ export function album(db, changed, schedule) {
           $('coverPhoto').src = src
           $('coverPhoto').alt = 'Obra de Adrio III el ' + day(latest.taken)
           $('coverFig').classList.add('withPhoto')
-          $('coverCaption').textContent = 'Desde la obra · ' + day(latest.taken)
+          $('coverCaption').textContent = day(latest.taken)
           $('coverLink').href = '#album'
           $('coverLink').onclick = () => choose(latest.taken)
         },
