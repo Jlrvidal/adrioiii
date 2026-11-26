@@ -9,10 +9,10 @@
     />
     <meta name="referrer" content="no-referrer" />
     <title>Seguimiento de Obra Adrio III</title>
-    <link rel="stylesheet" href="./style.css?v=calendario1" />
+    <link rel="stylesheet" href="./style.css?v=visual1" />
     <script defer src="./vendor/supabase-2.119.2.js"></script>
-    <script defer src="./config.js?v=calendario1"></script>
-    <script type="module" src="./src/app.js?v=calendario1"></script>
+    <script defer src="./config.js?v=visual1"></script>
+    <script type="module" src="./src/app.js?v=visual1"></script>
     <meta
       name="description"
       content="Seguimiento independiente de la obra de Adrio III. Consulta hitos, previsiones de entrega y observaciones de obra."
@@ -95,7 +95,8 @@
         </article>
         <article>
           <span class="eyelabel">Hitos confirmados</span
-          ><strong id="count"></strong>
+          ><strong id="count"></strong
+          ><span id="countBar" class="countBar" aria-hidden="true"></span>
         </article>
       </section>
       <section id="calendario" class="planning">
@@ -125,8 +126,8 @@
         <div class="chartfoot">
           <span id="yearKey"></span><small id="today"></small>
         </div>
-        <section class="readGuide" aria-labelledby="readGuideTitle">
-          <h3 id="readGuideTitle">Cómo leer el calendario</h3>
+        <details class="readGuide">
+          <summary><h3>Cómo leer el calendario</h3></summary>
           <ul>
             <li>
               <span class="sample" aria-hidden="true"
@@ -212,9 +213,8 @@
               </p>
             </li>
           </ul>
-        </section>
+        </details>
       </section>
-      <div class="journey" id="journey" aria-label="Hitos de la obra"></div>
       <section id="diario" class="journal">
         <div class="sectionTitle">
           <div>

@@ -323,11 +323,15 @@ try {
   await shot('realista')
   assert.equal(
     await page
-      .locator('#gantt,#vertical,#phaseList,#expected,details.method')
+      .locator('#gantt,#vertical,#phaseList,#expected,details.method,#journey')
       .count(),
     0,
   )
+  assert.equal(await page.locator('#countBar i').count(), 7)
   assert.equal(await page.locator('.readGuide li').count(), 8)
+  assert.equal(await page.locator('.readGuide li').first().isVisible(), false)
+  await page.locator('.readGuide summary').click()
+  await page.locator('.readGuide li').first().waitFor()
   await page.locator('.readGuide').scrollIntoViewIfNeeded()
   await shot('read-guide')
   await page.locator('#comparar').click()
